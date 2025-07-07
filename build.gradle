@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'org.jmonkeyengine:jme3-core:3.6.1-stable'
+    implementation 'org.jmonkeyengine:jme3-desktop:3.6.1-stable'
+    implementation 'org.jmonkeyengine:jme3-lwjgl3:3.6.1-stable'
+    implementation 'org.jmonkeyengine:jme3-effects:3.6.1-stable'
+    implementation 'org.jmonkeyengine:jme3-plugins:3.6.1-stable'
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+application {
+    mainClass.set('jMonkeyEngine.Main')
+}
+
+test {
+    useJUnitPlatform()
+}
