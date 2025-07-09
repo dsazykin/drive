@@ -24,4 +24,12 @@ hs_err_pid*
 replay_pid*
 
 /.idea/vcs.xml
+/src/main/java/jMonkeyEngine/Tests
 /.gradle
+/build
+/.idea
+/src/main/resources/Models/Jaime
+/src/main/resources/Models/Oto
+/src/main/resources/Models/Ninja.obj
+/src/main/resources/Models/Teapot.obj
+/src/main/resources/Scenes/town
