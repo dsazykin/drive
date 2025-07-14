@@ -59,7 +59,6 @@ public class Main extends SimpleApplication
 
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
-        bulletAppState.setDebugEnabled(true);
 
         setUpKeys();
         setUpLight();
@@ -148,27 +147,10 @@ public class Main extends SimpleApplication
 
         // 1. Get current speed
         float speed = FastMath.abs(control.getCurrentVehicleSpeedKmHour());
+        float velocity = speed / 3.6f;
 
-        float speedMs = speed / 3.6f;
-        float acceleration = car.getAccelerationConstant() * (car.getMaxSpeed() - speedMs);
-
-        float airDensity = 1.225f; // kg/m3
-        float dragCoefficient = 0.31f;
-        float frontalArea = 2.0f; // m2
-        float rollingResistanceCoefficient = 0.015f;
-        float gravity = 9.81f;
-
-        // Calculate Drag
-        float dragForce = 0.5f * airDensity * dragCoefficient * frontalArea * speedMs * speedMs;
-
-        // Calculate Rolling Resistance
-        float rollingResistance = rollingResistanceCoefficient * car.getMass() * gravity;
-
-        // Total Resistance
-        float totalResistance = dragForce + rollingResistance;
-
-        float engineForce = car.getMass() * acceleration;
-        float netForce = engineForce - totalResistance;
+        float resistance = calculateResistance(velocity);
+        float netForce = calculateAcceleration(velocity, resistance);
 
         if (car.isAccelerating()) {
             control.brake(0f);
@@ -178,8 +160,8 @@ public class Main extends SimpleApplication
             car.setAccelerationValue(0f);
             control.accelerate(car.getAccelerationValue());
             control.brake(200f);
-        }else if (speedMs > 0.5f) { // Apply resistance only if moving
-            control.accelerate(totalResistance);
+        } else if (velocity > 0.5f) { // Apply resistance only if moving
+            control.accelerate(resistance);
         } else {
             // Prevent creeping backwards/forwards numerically
             control.accelerate(0f);
@@ -188,39 +170,50 @@ public class Main extends SimpleApplication
 
         if (car.getTargetSteeringValue() != 0f && speed > 100f) {
             float maxHoldSteer = 0.6f; // tune this
-            car.setTargetSteeringValue(FastMath.clamp(car.getTargetSteeringValue(), -maxHoldSteer, maxHoldSteer));
+            car.setTargetSteeringValue(
+                    FastMath.clamp(car.getTargetSteeringValue(), -maxHoldSteer, maxHoldSteer));
         }
 
         // 2. Compute steer factor based on speed
         float maxSteer = 0.8f;
         float minSteer = 0.2f;
         // Max steering at 0 km/h, minimal at 100+
-        float steerFactor = FastMath.clamp(1.0f / (1.0f + (speed * speed / 25000f)), minSteer, maxSteer);
+        float steerFactor =
+                FastMath.clamp(1.0f / (1.0f + (speed * speed / 25000f)), minSteer, maxSteer);
 
         // 3. Interpolate toward target
         float interpSpeed;
-        if (speed < 150f) {
-            interpSpeed = (car.getTargetSteeringValue() == 0f) ? 0.06f : 0.03f;
-        } else {
-            interpSpeed = (car.getTargetSteeringValue() == 0f) ? 0.01f + (speed / 3000f) : 0.03f;
-        }
-        float smoothedSteering = FastMath.interpolateLinear(interpSpeed, car.getSteeringValue(), car.getTargetSteeringValue());
+        interpSpeed = (car.getTargetSteeringValue() == 0f) ? 0.4f : 0.2f;
+        float smoothedSteering = FastMath.interpolateLinear(interpSpeed, car.getSteeringValue(),
+                                                            car.getTargetSteeringValue());
         car.setSteeringValue(smoothedSteering);
 
         // 4. Scale it based on steerFactor
         // Dynamically clamp the final steering angle
-        float maxAllowedSteering = FastMath.clamp(1f - (speed / 100f), 0.15f, maxSteer);  // or 0.8f if you want it more generous
-        float scaledSteering = FastMath.clamp(car.getSteeringValue(), -maxAllowedSteering, maxAllowedSteering) * steerFactor;
+        float maxAllowedSteering = FastMath.clamp(1f - (speed / 100f), 0.15f,
+                                                  maxSteer);  // or 0.8f if you want it more generous
+        float scaledSteering =
+                FastMath.clamp(car.getSteeringValue(), -maxAllowedSteering, maxAllowedSteering) *
+                        steerFactor;
 
         // 5. Apply to vehicle
         control.steer(scaledSteering);
 
+        if (Math.abs(car.getSteeringValue()) > 0.6 && car.isAccelerating()) {
+            float driftFactor = computeDriftFactor();
+            control.getWheel(2).setFrictionSlip(4f * driftFactor);
+            control.getWheel(3).setFrictionSlip(4f * driftFactor);
+        } else {
+            control.getWheel(2).setFrictionSlip(4f);
+            control.getWheel(3).setFrictionSlip(4f);
+        }
+
         Vector3f forward = control.getForwardVector(null).normalizeLocal();
 
         // === SMOOTH CAMERA FOLLOW ===
-        Vector3f targetCamPos = control.getPhysicsLocation()
-                .add(forward.negate().mult(-10f)) // 20 units behind
-                .add(0, 6f, 0);
+        Vector3f targetCamPos =
+                control.getPhysicsLocation().add(forward.negate().mult(-10f)) // 20 units behind
+                        .add(0, 6f, 0);
 
         // Interpolate camera position
         float lerpSpeed = 5f; // higher = faster
@@ -231,6 +224,36 @@ public class Main extends SimpleApplication
         cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
 
         speedText.setText(String.format("Speed: %.1f km/h", speed));
-        accText.setText(String.format("Acceleration: %.1f", car.getAccelerationValue() / car.getMass()));
+        accText.setText(
+                String.format("Acceleration: %.1f", car.getAccelerationValue() / car.getMass()));
+    }
+
+    float computeDriftFactor() {
+        return FastMath.clamp(1f - (Math.abs(car.getSteeringValue()) / 0.6f) * 10, 0.5f, 1f);
+    }
+
+    private float calculateAcceleration(float velocity, float resistance) {
+        float acceleration = car.getAccelerationConstant() * (car.getMaxSpeed() - velocity);
+
+        float engineForce = car.getMass() * acceleration;
+
+        return engineForce - resistance;
+    }
+
+    private float calculateResistance (float velocity) {
+        float airDensity = 1.225f; // kg/m3
+        float dragCoefficient = 0.31f;
+        float frontalArea = 2.0f; // m2
+        float rollingResistanceCoefficient = 0.015f;
+        float gravity = 9.81f;
+
+        // Calculate Drag
+        float dragForce = 0.5f * airDensity * dragCoefficient * frontalArea * velocity * velocity;
+
+        // Calculate Rolling Resistance
+        float rollingResistance = rollingResistanceCoefficient * car.getMass() * gravity;
+
+        // Total Resistance
+        return dragForce + rollingResistance;
     }
 }
