@@ -7,7 +7,6 @@ version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
-    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -18,10 +17,12 @@ dependencies {
     implementation 'org.jmonkeyengine:jme3-plugins:3.6.1-stable'
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    implementation 'org.jmonkeyengine:jme3-bullet:3.3.0-beta1'
+    implementation 'org.jmonkeyengine:jme3-bullet-native:3.3.0-beta1'
 }
 
 application {
-    mainClass.set('jMonkeyEngine.Main')
+    mainClass.set('jMonkeyEngine.Tests.HelloCollision')
 }
 
 test {
