@@ -168,36 +168,27 @@ public class Main extends SimpleApplication
             control.brake(1f); // Apply a tiny brake to zero out residual velocity
         }
 
-        if (car.getTargetSteeringValue() != 0f && speed > 100f) {
-            float maxHoldSteer = 0.6f; // tune this
-            car.setTargetSteeringValue(
-                    FastMath.clamp(car.getTargetSteeringValue(), -maxHoldSteer, maxHoldSteer));
+        // Define max steering angle regardless of speed
+        float MAX_STEERING_ANGLE = 0.8f;  // full lock
+
+        // Responsiveness factor: lower at high speeds
+        float steeringResponse;
+        if (car.getTargetSteeringValue() == 0f) {
+            steeringResponse = 2f;
+        } else {
+            steeringResponse = FastMath.clamp(1f / (1f + (speed * speed / 2750)), 0.1f, 1f);
         }
 
-        // 2. Compute steer factor based on speed
-        float maxSteer = 0.8f;
-        float minSteer = 0.2f;
-        // Max steering at 0 km/h, minimal at 100+
-        float steerFactor =
-                FastMath.clamp(1.0f / (1.0f + (speed * speed / 25000f)), minSteer, maxSteer);
+        // Gradually approach the target steering
+        float deltaSteering = (car.getTargetSteeringValue() - car.getSteeringValue()) * steeringResponse * tpf * 5f;
+        car.setSteeringValue(car.getSteeringValue() + deltaSteering);
 
-        // 3. Interpolate toward target
-        float interpSpeed;
-        interpSpeed = (car.getTargetSteeringValue() == 0f) ? 0.4f : 0.2f;
-        float smoothedSteering = FastMath.interpolateLinear(interpSpeed, car.getSteeringValue(),
-                                                            car.getTargetSteeringValue());
-        car.setSteeringValue(smoothedSteering);
-
-        // 4. Scale it based on steerFactor
-        // Dynamically clamp the final steering angle
-        float maxAllowedSteering = FastMath.clamp(1f - (speed / 100f), 0.15f,
-                                                  maxSteer);  // or 0.8f if you want it more generous
-        float scaledSteering =
-                FastMath.clamp(car.getSteeringValue(), -maxAllowedSteering, maxAllowedSteering) *
-                        steerFactor;
+        // Clamp final steering within max
+        //float interpSpeed = (car.getTargetSteeringValue() == 0f) ? 0.4f : 0.2f;
+        car.setSteeringValue(FastMath.clamp(car.getSteeringValue(), -MAX_STEERING_ANGLE, MAX_STEERING_ANGLE));
 
         // 5. Apply to vehicle
-        control.steer(scaledSteering);
+        control.steer(car.getSteeringValue());
 
         if (Math.abs(car.getSteeringValue()) > 0.6 && car.isAccelerating()) {
             float driftFactor = computeDriftFactor();
