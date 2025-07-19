@@ -29,11 +29,6 @@ import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import jMonkeyEngine.Entities.Car;
 
-/**
- * Example 9 - How to make walls and floors solid.
- * This collision code uses Physics and a custom Action Listener.
- * @author normen, with edits by Zathras
- */
 public class Main extends SimpleApplication
         implements ActionListener {
 
@@ -42,7 +37,10 @@ public class Main extends SimpleApplication
     private Car car;
 
     private BitmapText speedText;
-    private BitmapText accText;
+    private BitmapText frontLeftText;
+    private BitmapText frontRightText;
+    private BitmapText rearLeftText;
+    private BitmapText rearRightText;
 
     private Vector3f cameraPos = new Vector3f(); // current interpolated camera position
 
@@ -71,10 +69,25 @@ public class Main extends SimpleApplication
         speedText.setLocalTranslation(10, cam.getHeight() - 10, 0); // top-left corner
         guiNode.attachChild(speedText);
 
-        accText = new BitmapText(guiFont, false);
-        accText.setSize(guiFont.getCharSet().getRenderedSize());
-        accText.setLocalTranslation(10, cam.getHeight() - 30, 0); // top-left corner
-        guiNode.attachChild(accText);
+        frontLeftText = new BitmapText(guiFont, false);
+        frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
+        frontLeftText.setLocalTranslation(10, cam.getHeight() - 50, 0); // top-left corner
+        guiNode.attachChild(frontLeftText);
+
+        frontRightText = new BitmapText(guiFont, false);
+        frontRightText.setSize(guiFont.getCharSet().getRenderedSize());
+        frontRightText.setLocalTranslation(130, cam.getHeight() - 50, 0); // top-left corner
+        guiNode.attachChild(frontRightText);
+
+        rearLeftText = new BitmapText(guiFont, false);
+        rearLeftText.setSize(guiFont.getCharSet().getRenderedSize());
+        rearLeftText.setLocalTranslation(10, cam.getHeight() - 70, 0); // top-left corner
+        guiNode.attachChild(rearLeftText);
+
+        rearRightText = new BitmapText(guiFont, false);
+        rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
+        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0); // top-left corner
+        guiNode.attachChild(rearRightText);
     }
 
     private void loadScene() {
@@ -146,11 +159,53 @@ public class Main extends SimpleApplication
         VehicleControl control = car.getControl();
 
         // 1. Get current speed
-        float speed = FastMath.abs(control.getCurrentVehicleSpeedKmHour());
+        float speed = -control.getCurrentVehicleSpeedKmHour();
         float velocity = speed / 3.6f;
 
         float resistance = calculateResistance(velocity);
         float netForce = calculateAcceleration(velocity, resistance);
+
+        // Forward/Backward weight transfer
+        float weightTransferLongitudinal =
+                (car.getMass() * (car.getAccelerationValue() / car.getMass()) * car.getCgHeight()) /
+                        car.getWheelBase();
+
+        // Lateral (side-to-side) weight transfer during turns
+        float weightTransferLateral =
+                (car.getMass() * (control.getAngularVelocity().y * velocity) * car.getCgHeight()) /
+                        car.getTrackWidth();
+
+        float totalMass = car.getMass();
+        float gravity = 9.81f;
+        float staticFrontLoad = totalMass * gravity * 0.5f;
+        float staticRearLoad = totalMass * gravity * 0.5f;
+        float staticLeftLoad = totalMass * gravity * 0.5f;
+        float staticRightLoad = totalMass * gravity * 0.5f;
+
+        float frontLoad = staticFrontLoad - weightTransferLongitudinal / 2f;
+        float rearLoad = staticRearLoad + weightTransferLongitudinal / 2f;
+
+        float leftLoad = staticLeftLoad - weightTransferLateral / 2f;
+        float rightLoad = staticRightLoad + weightTransferLateral / 2f;
+
+        // Normalize loads to static weight for scaling
+        float frontLoadFactor = frontLoad / staticFrontLoad;
+        float rearLoadFactor = rearLoad / staticRearLoad;
+        float leftLoadFactor = leftLoad / staticLeftLoad;
+        float rightLoadFactor = rightLoad / staticRightLoad;
+
+        float speedFactor = FastMath.clamp(1f - (speed / 300f), 0.9f, 1f);
+        float frontLeftFriction = (3f * (frontLoadFactor * leftLoadFactor * 1.1f)) + 0.5f;
+        float frontRightFriction = (3f * (frontLoadFactor * rightLoadFactor * 1.1f)) + 0.5f;
+        float backLeftFriction = (3.5f * (rearLoadFactor * leftLoadFactor * 1.1f)) + 0.5f;
+        float backRightFriction = (3.5f * (rearLoadFactor * rightLoadFactor * 1.1f)) + 0.5f;
+
+        // Apply normalized load to base friction
+        control.getWheel(0).setFrictionSlip(frontLeftFriction * speedFactor);
+        control.getWheel(1).setFrictionSlip(frontRightFriction * speedFactor);
+
+        control.getWheel(2).setFrictionSlip(backLeftFriction * speedFactor);
+        control.getWheel(3).setFrictionSlip(backRightFriction * speedFactor);
 
         if (car.isAccelerating()) {
             control.brake(0f);
@@ -175,16 +230,15 @@ public class Main extends SimpleApplication
             control.brake(1f); // Apply a tiny brake to zero out residual velocity
         }
 
-
         // Define max steering angle regardless of speed
-        float MAX_STEERING_ANGLE = 0.8f;  // full lock
+        float MAX_STEERING_ANGLE = 0.8f;
 
         // Responsiveness factor: lower at high speeds
         float steeringResponse;
         if (car.getTargetSteeringValue() == 0f) {
             steeringResponse = 2f;
         } else {
-            steeringResponse = FastMath.clamp(1f / (1f + (speed * speed / 2750)), 0.1f, 1f);
+            steeringResponse = FastMath.clamp(1f / (1f + (speed * speed / 2750)), 0.05f, 1f);
         }
 
         // Gradually approach the target steering
@@ -197,14 +251,9 @@ public class Main extends SimpleApplication
         // 5. Apply to vehicle
         control.steer(car.getSteeringValue());
 
-        if (Math.abs(car.getSteeringValue()) > 0.6 && car.isAccelerating()) {
-            float driftFactor = computeDriftFactor();
-            control.getWheel(2).setFrictionSlip(4f * driftFactor);
-            control.getWheel(3).setFrictionSlip(4f * driftFactor);
-        } else {
-            control.getWheel(2).setFrictionSlip(4f);
-            control.getWheel(3).setFrictionSlip(4f);
-        }
+        Vector3f angularVelocity = control.getAngularVelocity();
+        Vector3f angularDamping = angularVelocity.mult(-1f);  // tune this factor
+        control.applyTorque(angularDamping);
 
         Vector3f forward = control.getForwardVector(null).normalizeLocal();
 
@@ -222,12 +271,11 @@ public class Main extends SimpleApplication
         cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
 
         speedText.setText(String.format("Speed: %.1f km/h", speed));
-        accText.setText(
-                String.format("Acceleration: %.1f", car.getAccelerationValue() / car.getMass()));
-    }
 
-    float computeDriftFactor() {
-        return FastMath.clamp(1f - (Math.abs(car.getSteeringValue()) / 0.6f) * 10, 0.5f, 1f);
+        frontLeftText.setText(String.format("FL: %.1f", control.getWheel(0).getFrictionSlip()));
+        frontRightText.setText(String.format("FR: %.1f", control.getWheel(1).getFrictionSlip()));
+        rearLeftText.setText(String.format("RL: %.1f", control.getWheel(2).getFrictionSlip()));
+        rearRightText.setText(String.format("RR: %.1f", control.getWheel(3).getFrictionSlip()));
     }
 
     private float calculateAcceleration(float velocity, float resistance) {
