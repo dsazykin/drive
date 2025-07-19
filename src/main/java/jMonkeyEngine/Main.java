@@ -201,11 +201,11 @@ public class Main extends SimpleApplication
         float backRightFriction = (3.5f * (rearLoadFactor * rightLoadFactor * 1.1f)) + 0.5f;
 
         // Apply normalized load to base friction
-        control.getWheel(0).setFrictionSlip(FastMath.clamp(frontLeftFriction * speedFactor, 0, 100f));
-        control.getWheel(1).setFrictionSlip(FastMath.clamp(frontRightFriction * speedFactor, 0, 100f));
+        control.getWheel(0).setFrictionSlip(FastMath.clamp(frontLeftFriction * speedFactor, 0.5f, 100f));
+        control.getWheel(1).setFrictionSlip(FastMath.clamp(frontRightFriction * speedFactor, 0.5f, 100f));
 
-        control.getWheel(2).setFrictionSlip(backLeftFriction * speedFactor);
-        control.getWheel(3).setFrictionSlip(backRightFriction * speedFactor);
+        control.getWheel(2).setFrictionSlip(FastMath.clamp(backLeftFriction * speedFactor, 1f, 100f));
+        control.getWheel(3).setFrictionSlip(FastMath.clamp(backRightFriction * speedFactor, 1f, 100f));
 
         if (car.isAccelerating()) {
             control.brake(0f);
@@ -250,7 +250,11 @@ public class Main extends SimpleApplication
         control.steer(car.getSteeringValue());
 
         Vector3f angularVelocity = control.getAngularVelocity();
-        Vector3f angularDamping = angularVelocity.mult(-1f);  // tune this factor
+        Vector3f angularDamping = new Vector3f(
+                angularVelocity.x * -0.5f,
+                angularVelocity.y * -10f,  // stronger yaw damping
+                angularVelocity.z * -0.5f
+        );
         control.applyTorque(angularDamping);
 
         Vector3f forward = control.getForwardVector(null).normalizeLocal();
