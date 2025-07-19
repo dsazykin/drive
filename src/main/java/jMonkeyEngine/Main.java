@@ -201,8 +201,8 @@ public class Main extends SimpleApplication
         float backRightFriction = (3.5f * (rearLoadFactor * rightLoadFactor * 1.1f)) + 0.5f;
 
         // Apply normalized load to base friction
-        control.getWheel(0).setFrictionSlip(frontLeftFriction * speedFactor);
-        control.getWheel(1).setFrictionSlip(frontRightFriction * speedFactor);
+        control.getWheel(0).setFrictionSlip(FastMath.clamp(frontLeftFriction * speedFactor, 0, 100f));
+        control.getWheel(1).setFrictionSlip(FastMath.clamp(frontRightFriction * speedFactor, 0, 100f));
 
         control.getWheel(2).setFrictionSlip(backLeftFriction * speedFactor);
         control.getWheel(3).setFrictionSlip(backRightFriction * speedFactor);
