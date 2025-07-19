@@ -194,7 +194,7 @@ public class Main extends SimpleApplication
         float leftLoadFactor = leftLoad / staticLeftLoad;
         float rightLoadFactor = rightLoad / staticRightLoad;
 
-        float speedFactor = FastMath.clamp(1f - (speed / 300f), 0.9f, 1f);
+        float speedFactor = 1f / (1 - (3 * FastMath.log(1 / (0.0002f * FastMath.abs(speed) + 1)) ));
         float frontLeftFriction = (3f * (frontLoadFactor * leftLoadFactor * 1.1f)) + 0.5f;
         float frontRightFriction = (3f * (frontLoadFactor * rightLoadFactor * 1.1f)) + 0.5f;
         float backLeftFriction = (3.5f * (rearLoadFactor * leftLoadFactor * 1.1f)) + 0.5f;
@@ -213,12 +213,10 @@ public class Main extends SimpleApplication
             control.accelerate(car.getAccelerationValue() / 3.7f);
         } else if (car.isBreaking()) {
             if (speed > 0.1) {
-                System.out.println("break");
                 car.setAccelerationValue(0f);
                 control.accelerate(car.getAccelerationValue());
                 control.brake(200f);
             } else {
-                System.out.println("reverse");
                 car.setAccelerationValue(calculateReverseAcceleration(-velocity, resistance));
                 control.accelerate(car.getAccelerationValue() / 3.7f);
             }
