@@ -20,9 +20,17 @@ public class Car {
     private float steeringValue = 0;
     private float accelerationValue = 0;
     private float targetSteeringValue = 0;
-    private final float maxSpeed = (float) (320 / 3.6);
-    private final float mass = 1640;
+
+    private final float maxSpeed = 320f / 3.6f;
     private final float accelerationConstant = 0.1441128652f;
+
+    private final float maxReverse = 16.667f;
+    private final float reverseConstant = 0.2985932482f;
+
+    private float wheelBase;
+    private float trackWidth;
+    private final float cgHeight = 0.4f;
+    private final float mass = 1640;
 
     private boolean accelerating = false;
     private boolean breaking = false;
@@ -79,6 +87,26 @@ public class Car {
         return breaking;
     }
 
+    public float getWheelBase() {
+        return wheelBase;
+    }
+
+    public float getTrackWidth() {
+        return trackWidth;
+    }
+
+    public float getCgHeight() {
+        return cgHeight;
+    }
+
+    public float getMaxReverse() {
+        return maxReverse;
+    }
+
+    public float getReverseConstant() {
+        return reverseConstant;
+    }
+
     public Car(AssetManager assetManager, PhysicsSpace physicsSpace) {
         float stiffness = 120.0f;
         float compValue = 0.2f;
@@ -118,6 +146,8 @@ public class Car {
         control.getWheel(3).setFrictionSlip(4f); // rear right
 
         physicsSpace.add(control);
+
+        calculateWheelbaseAndTrackWidth();
     }
 
     private void addWheel(String name, float heightOffset, float radius, boolean front,
@@ -147,6 +177,21 @@ public class Car {
             return (Geometry) spatial;
         }
         return null;
+    }
+
+    private void calculateWheelbaseAndTrackWidth() {
+        Vector3f frontLeft = findGeom(carNode, "WheelFrontLeft").getWorldTranslation();
+        Vector3f frontRight = findGeom(carNode, "WheelFrontRight").getWorldTranslation();
+        Vector3f backLeft = findGeom(carNode, "WheelBackLeft").getWorldTranslation();
+        Vector3f backRight = findGeom(carNode, "WheelBackRight").getWorldTranslation();
+
+        // Track width: distance between front left and right
+        trackWidth = frontLeft.distance(frontRight);
+
+        // Wheelbase: average of distances between front and back wheels (left and right side)
+        float leftWheelbase = frontLeft.distance(backLeft);
+        float rightWheelbase = frontRight.distance(backRight);
+        wheelBase = (leftWheelbase + rightWheelbase) / 2f;
     }
 
     public VehicleControl getControl() {

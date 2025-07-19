@@ -157,9 +157,16 @@ public class Main extends SimpleApplication
             car.setAccelerationValue(-netForce);
             control.accelerate(car.getAccelerationValue() / 3.7f);
         } else if (car.isBreaking()) {
-            car.setAccelerationValue(0f);
-            control.accelerate(car.getAccelerationValue());
-            control.brake(200f);
+            if (speed > 0.1) {
+                System.out.println("break");
+                car.setAccelerationValue(0f);
+                control.accelerate(car.getAccelerationValue());
+                control.brake(200f);
+            } else {
+                System.out.println("reverse");
+                car.setAccelerationValue(calculateReverseAcceleration(-velocity, resistance));
+                control.accelerate(car.getAccelerationValue() / 3.7f);
+            }
         } else if (velocity > 0.5f) { // Apply resistance only if moving
             control.accelerate(resistance);
         } else {
@@ -167,6 +174,7 @@ public class Main extends SimpleApplication
             control.accelerate(0f);
             control.brake(1f); // Apply a tiny brake to zero out residual velocity
         }
+
 
         // Define max steering angle regardless of speed
         float MAX_STEERING_ANGLE = 0.8f;  // full lock
@@ -184,7 +192,6 @@ public class Main extends SimpleApplication
         car.setSteeringValue(car.getSteeringValue() + deltaSteering);
 
         // Clamp final steering within max
-        //float interpSpeed = (car.getTargetSteeringValue() == 0f) ? 0.4f : 0.2f;
         car.setSteeringValue(FastMath.clamp(car.getSteeringValue(), -MAX_STEERING_ANGLE, MAX_STEERING_ANGLE));
 
         // 5. Apply to vehicle
@@ -225,6 +232,14 @@ public class Main extends SimpleApplication
 
     private float calculateAcceleration(float velocity, float resistance) {
         float acceleration = car.getAccelerationConstant() * (car.getMaxSpeed() - velocity);
+
+        float engineForce = car.getMass() * acceleration;
+
+        return engineForce - resistance;
+    }
+
+    private float calculateReverseAcceleration(float velocity, float resistance) {
+        float acceleration = car.getReverseConstant() * (car.getMaxReverse() - velocity);
 
         float engineForce = car.getMass() * acceleration;
 
