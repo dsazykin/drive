@@ -1,12 +1,11 @@
 package jMonkeyEngine.Terrain;
 
-import com.jme3.math.FastMath;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
-public class TerrainGenerator {
+public class HeightMapGenerator {
 
     public float[][] generateHeightmap(int width, int height, long seed, double scale)
             throws IOException {
@@ -45,7 +44,7 @@ public class TerrainGenerator {
     }
 
     public static void main(String[] args) throws IOException {
-        TerrainGenerator generator = new TerrainGenerator();
+        HeightMapGenerator generator = new HeightMapGenerator();
 
         long seed = 1234L;
         float[][] heightmap = generator.generateHeightmap(512, 512, seed, 50.0);
