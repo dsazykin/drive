@@ -25,14 +25,13 @@ public class TerrainGenerator extends SimpleApplication {
         app.start();
     }
 
-    private float[][] generateHeightMap(int size, double scale) throws IOException {
-        this.heightMap = new HeightMapGenerator();
-        return heightMap.generateHeightmap(size, size, 1234L, scale);
+    private float[][] generateHeightMap(int size, double scale, int chunkX, int chunkZ) throws IOException {
+        return heightMap.generateHeightmap(size, size, 1234L, scale, chunkX, chunkZ);
     }
 
     private Mesh generateChunkMesh(int chunkX, int chunkZ, int size, double scale)
             throws IOException {
-        float[][] terrain = generateHeightMap(size, scale);
+        float[][] terrain = generateHeightMap(size, scale, chunkX, chunkZ);
 
         Mesh mesh = new Mesh();
 
@@ -56,9 +55,9 @@ public class TerrainGenerator extends SimpleApplication {
                 colors[vertexIndex] = color;
 
                 vertices[vertexIndex++] = new Vector3f(
-                        (float) x,
-                        (float) (height * scale),
-                        (float) z
+                        (float) ((chunkX * (size - 1) + x)), // world X coordinate
+                        height * 50f, // height
+                        (float) ((chunkZ * (size - 1) + z)) // world Z coordinate
                 );
             }
         }
@@ -84,9 +83,6 @@ public class TerrainGenerator extends SimpleApplication {
             }
         }
 
-        // generate indices here for triangles...
-        // skipped for brevity, but follow standard grid mesh indexing.
-
         mesh.setBuffer(VertexBuffer.Type.Position, 3, BufferUtils.createFloatBuffer(vertices));
         mesh.setBuffer(VertexBuffer.Type.Index, 3, BufferUtils.createIntBuffer(indices));
         mesh.setBuffer(VertexBuffer.Type.Color, 4, BufferUtils.createFloatBuffer(colors));
@@ -96,6 +92,8 @@ public class TerrainGenerator extends SimpleApplication {
 
     @Override
     public void simpleInitApp() {
+        this.heightMap = new HeightMapGenerator();
+
         //viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
         flyCam.setEnabled(true);
         flyCam.setMoveSpeed(100);
@@ -113,21 +111,33 @@ public class TerrainGenerator extends SimpleApplication {
 
     private void CreateTerrain() {
         Mesh mesh;
-        try {
-            mesh = generateChunkMesh(0, 0, 512, 50);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        Geometry chunkGeom = new Geometry("Chunk", mesh);
-        Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
-        mat.setBoolean("VertexColor", true);
-        chunkGeom.setMaterial(mat);
+        int chunkSize = 200;
+        float scale = 100f; // Or your preferred scale
+        int renderRadius = 2; // 1 = 3x3 grid
 
-        MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
-        RigidBodyControl chunkPhysics = new RigidBodyControl(terrainShape, 0);
-        chunkGeom.addControl(chunkPhysics);
-        bulletAppState.getPhysicsSpace().add(chunkPhysics);
-        rootNode.attachChild(chunkGeom);
+        for (int chunkZ = -renderRadius; chunkZ <= renderRadius; chunkZ++) {
+            for (int chunkX = -renderRadius; chunkX <= renderRadius; chunkX++) {
+
+                try {
+                    mesh = generateChunkMesh(chunkX, chunkZ, chunkSize, scale);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+
+                Geometry chunkGeom = new Geometry("Chunk_" + chunkX + "_" + chunkZ, mesh);
+
+                Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+                mat.setBoolean("VertexColor", true);
+                chunkGeom.setMaterial(mat);
+
+                MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
+                RigidBodyControl chunkPhysics = new RigidBodyControl(terrainShape, 0);
+                chunkGeom.addControl(chunkPhysics);
+                bulletAppState.getPhysicsSpace().add(chunkPhysics);
+
+                rootNode.attachChild(chunkGeom);
+            }
+        }
     }
 
     private void setUpLight() {
