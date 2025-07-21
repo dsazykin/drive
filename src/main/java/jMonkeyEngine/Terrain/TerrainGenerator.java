@@ -4,6 +4,7 @@ import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.collision.shapes.MeshCollisionShape;
 import com.jme3.bullet.control.RigidBodyControl;
+import com.jme3.font.BitmapText;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
@@ -12,18 +13,23 @@ import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.VertexBuffer;
+import com.jme3.ui.Picture;
 import com.jme3.util.BufferUtils;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class TerrainGenerator extends SimpleApplication {
 
     BulletAppState bulletAppState;
     HeightMapGenerator heightMap;
 
-    Thread thread1;
-    Thread thread2;
+    private List<Future<?>> chunkTasks;
+    private boolean loadingDone = false;
+    private BitmapText loadingText;
 
     public static void main(String[] args) {
         TerrainGenerator app = new TerrainGenerator();
@@ -100,12 +106,18 @@ public class TerrainGenerator extends SimpleApplication {
         this.heightMap = new HeightMapGenerator();
 
         //viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
-        flyCam.setEnabled(true);
+        enablePlayerControls(false);
         flyCam.setMoveSpeed(100);
 
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
         //bulletAppState.setDebugEnabled(true);
+
+        loadingText = new BitmapText(guiFont, false);
+        loadingText.setSize(guiFont.getCharSet().getRenderedSize());
+        loadingText.setText("Loading terrain...");
+        loadingText.setLocalTranslation(300, 300, 0);
+        guiNode.attachChild(loadingText);
 
         CreateTerrain();
         setUpLight();
@@ -117,16 +129,17 @@ public class TerrainGenerator extends SimpleApplication {
     private void CreateTerrain() {
         int chunkSize = 200;
         float scale = 100f; // Or your preferred scale
-        int renderRadius = 3; // Grid size will be (2 * renderRadius - 1)^2
+        int renderRadius = 5; // Grid size will be (2 * renderRadius - 1)^2
 
         ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        chunkTasks = new ArrayList<>();
 
         for (int chunkZ = -renderRadius; chunkZ <= renderRadius; chunkZ++) {
             for (int chunkX = -renderRadius; chunkX <= renderRadius; chunkX++) {
                 final int finalChunkX = chunkX;
                 final int finalChunkZ = chunkZ;
 
-                executor.submit(() -> {
+                Future<?> future = executor.submit(() -> {
                     try {
                         Mesh mesh = generateChunkMesh(finalChunkX, finalChunkZ, chunkSize, scale);
 
@@ -139,20 +152,19 @@ public class TerrainGenerator extends SimpleApplication {
                         RigidBodyControl chunkPhysics = new RigidBodyControl(terrainShape, 0);
                         chunkGeom.addControl(chunkPhysics);
 
-                        // Enqueue scene updates on render thread
                         enqueue(() -> {
-                            bulletAppState.getPhysicsSpace().add(chunkPhysics);
                             rootNode.attachChild(chunkGeom);
+                            bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
                             return null;
                         });
-
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 });
+
+                chunkTasks.add(future);
             }
         }
-
         executor.shutdown();
     }
 
@@ -167,4 +179,25 @@ public class TerrainGenerator extends SimpleApplication {
         dl.setDirection(new Vector3f(2.8f, -2.8f, -2.8f).normalizeLocal());
         rootNode.addLight(dl);
     }
+
+    private void enablePlayerControls(boolean enabled) {
+        flyCam.setEnabled(enabled);
+        inputManager.setCursorVisible(!enabled);
+    }
+
+    @Override
+    public void simpleUpdate(float tpf) {
+        if (!loadingDone && chunkTasks != null) {
+            boolean allDone = chunkTasks.stream().allMatch(Future::isDone);
+            if (allDone) {
+                loadingDone = true;
+                enqueue(() -> {
+                    enqueue(() -> guiNode.detachChild(loadingText));
+                    enablePlayerControls(true);
+                    return null;
+                });
+            }
+        }
+    }
+
 }
