@@ -26,10 +26,11 @@ public class TerrainGenerator extends SimpleApplication {
     BulletAppState bulletAppState;
     HeightMapGenerator heightMap;
     ChunkManager manager;
+    ExecutorService executor;
 
-    int chunkSize = 50;
+    int chunkSize = 200;
     float scale = 100f;
-    int renderDistance = 3; // Grid size will be (2 * renderDistance - 1)^2
+    int renderDistance = 2; // Grid size will be (2 * renderDistance - 1)^2
 
     private List<Future<?>> chunkTasks;
     private boolean loadingDone = false;
@@ -121,8 +122,6 @@ public class TerrainGenerator extends SimpleApplication {
         RigidBodyControl chunkPhysics = new RigidBodyControl(terrainShape, 0);
         chunkGeom.addControl(chunkPhysics);
 
-        manager.addChunk(finalChunkX, finalChunkZ, chunkGeom);
-
         return chunkGeom;
     }
 
@@ -130,11 +129,13 @@ public class TerrainGenerator extends SimpleApplication {
     public void simpleInitApp() {
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
+        executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         //bulletAppState.setDebugEnabled(true);
 
         this.heightMap = new HeightMapGenerator();
-        this.manager = new ChunkManager(rootNode, assetManager, bulletAppState, this, chunkSize, scale,
-                                        renderDistance);
+        this.manager =
+                new ChunkManager(rootNode, assetManager, bulletAppState, this, executor, chunkSize,
+                                 scale, renderDistance);
 
         //viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
         enablePlayerControls(false);
@@ -149,7 +150,7 @@ public class TerrainGenerator extends SimpleApplication {
         CreateTerrain();
         setUpLight();
 
-        cam.setLocation(new Vector3f(32, 50, 32));
+        cam.setLocation(new Vector3f(32, 500, 32));
         cam.lookAt(Vector3f.ZERO, Vector3f.UNIT_Y);
     }
 
@@ -188,7 +189,6 @@ public class TerrainGenerator extends SimpleApplication {
     }
 
     private void CreateTerrain() {
-        ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         chunkTasks = new ArrayList<>();
 
         for (int chunkZ = -renderDistance; chunkZ <= renderDistance; chunkZ++) {
@@ -199,10 +199,10 @@ public class TerrainGenerator extends SimpleApplication {
                 Future<?> future = executor.submit(() -> {
                     try {
                         Mesh mesh = generateChunkMesh(finalChunkX, finalChunkZ, chunkSize, scale);
-
                         Geometry chunkGeom = createGeometry(finalChunkX, finalChunkZ, mesh);
 
                         enqueue(() -> {
+                            manager.addChunk(finalChunkX, finalChunkZ, chunkGeom);
                             rootNode.attachChild(chunkGeom);
                             bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
                             return null;
@@ -215,7 +215,7 @@ public class TerrainGenerator extends SimpleApplication {
                 chunkTasks.add(future);
             }
         }
-        executor.shutdown();
+        //executor.shutdown();
     }
 
 }
