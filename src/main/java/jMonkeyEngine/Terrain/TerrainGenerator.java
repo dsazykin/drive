@@ -28,8 +28,8 @@ public class TerrainGenerator extends SimpleApplication {
     ChunkManager manager;
     ExecutorService executor;
 
-    int chunkSize = 200;
-    float scale = 100f;
+    int chunkSize = 16;
+    float scale = 4f;
     int renderDistance = 2; // Grid size will be (2 * renderDistance - 1)^2
 
     private List<Future<?>> chunkTasks;
@@ -70,11 +70,18 @@ public class TerrainGenerator extends SimpleApplication {
                 }
                 colors[vertexIndex] = color;
 
+//                vertices[vertexIndex++] = new Vector3f(
+//                        (float) ((chunkX * (size - 1) + x) * scale), // world X coordinate
+//                        (float) (height * scale), // height
+//                        (float) ((chunkZ * (size - 1) + z) * scale) // world Z coordinate
+//                );
+
                 vertices[vertexIndex++] = new Vector3f(
-                        (float) ((chunkX * (size - 1) + x)), // world X coordinate
-                        height * 50f, // height
-                        (float) ((chunkZ * (size - 1) + z)) // world Z coordinate
+                        (float) (x * (scale / 4)),
+                        (float) (height * (scale / 4)),
+                        (float) (z * (scale / 4))
                 );
+
             }
         }
 
@@ -113,9 +120,9 @@ public class TerrainGenerator extends SimpleApplication {
         chunkGeom.setMaterial(mat);
 
         chunkGeom.setLocalTranslation(
-                finalChunkX,
+                finalChunkX * (chunkSize - 1) * (scale / 4),
                 0,
-                finalChunkZ
+                finalChunkZ * (chunkSize - 1) * (scale / 4)
         );
 
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
@@ -139,7 +146,7 @@ public class TerrainGenerator extends SimpleApplication {
 
         //viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
         enablePlayerControls(false);
-        flyCam.setMoveSpeed(100);
+        flyCam.setMoveSpeed(300);
 
         loadingText = new BitmapText(guiFont, false);
         loadingText.setSize(guiFont.getCharSet().getRenderedSize());

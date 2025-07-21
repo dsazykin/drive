@@ -53,8 +53,8 @@ public class ChunkManager {
     }
 
     public void updateChunks(Vector3f playerPos) {
-        int playerChunkX = (int) Math.floor(playerPos.x / chunkSize);
-        int playerChunkZ = (int) Math.floor(playerPos.z / chunkSize);
+        int playerChunkX = (int) Math.floor(playerPos.x / (chunkSize * (scale / 4)));
+        int playerChunkZ = (int) Math.floor(playerPos.z / (chunkSize * (scale / 4)));
 
         Set<String> neededChunks = new HashSet<>();
 
@@ -76,7 +76,7 @@ public class ChunkManager {
 
                             generator.enqueue(() -> {
                                 loadedChunks.put(key, chunk);
-                                neededChunks.remove(key);
+                                loadingChunks.remove(key);
                                 rootNode.attachChild(chunk);
                                 bulletAppState.getPhysicsSpace().add(chunk.getControl(RigidBodyControl.class));
                             });
