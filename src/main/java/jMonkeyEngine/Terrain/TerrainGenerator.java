@@ -37,10 +37,24 @@ public class TerrainGenerator extends SimpleApplication {
         Mesh mesh = new Mesh();
 
         Vector3f[] vertices = new Vector3f[size * size];
+        ColorRGBA[] colors = new ColorRGBA[vertices.length];
         int vertexIndex = 0;
         for (int z = 0; z < size; z++) {
             for (int x = 0; x < size; x++) {
                 float height = terrain[x][z];
+
+                ColorRGBA color;
+                if (height < 0.05f) {
+                    color = new ColorRGBA(0f, 0f, 1f, 1f); // Blue (water)
+                } else if (height < 0.8f) {
+                    color = new ColorRGBA(0f, 1f, 0f, 1f); // Green (grass)
+                } else if (height < 0.9f) {
+                    color = new ColorRGBA(0.5f, 0.35f, 0.05f, 1f); // Brown (dirt)
+                } else {
+                    color = new ColorRGBA(1f, 1f, 1f, 1f); // White (snow)
+                }
+                colors[vertexIndex] = color;
+
                 vertices[vertexIndex++] = new Vector3f(
                         (float) x,
                         (float) (height * scale),
@@ -75,6 +89,7 @@ public class TerrainGenerator extends SimpleApplication {
 
         mesh.setBuffer(VertexBuffer.Type.Position, 3, BufferUtils.createFloatBuffer(vertices));
         mesh.setBuffer(VertexBuffer.Type.Index, 3, BufferUtils.createIntBuffer(indices));
+        mesh.setBuffer(VertexBuffer.Type.Color, 4, BufferUtils.createFloatBuffer(colors));
         mesh.updateBound();
         return mesh;
     }
@@ -87,7 +102,7 @@ public class TerrainGenerator extends SimpleApplication {
 
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
-        bulletAppState.setDebugEnabled(true);
+        //bulletAppState.setDebugEnabled(true);
 
         CreateTerrain();
         setUpLight();
@@ -97,18 +112,15 @@ public class TerrainGenerator extends SimpleApplication {
     }
 
     private void CreateTerrain() {
-        Mesh mesh = null;
+        Mesh mesh;
         try {
-            mesh = generateChunkMesh(0, 0, 1024, 50);
+            mesh = generateChunkMesh(0, 0, 512, 50);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
         Geometry chunkGeom = new Geometry("Chunk", mesh);
-        Material mat = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
-        mat.setBoolean("UseMaterialColors", true);
-        mat.setColor("Diffuse", ColorRGBA.Green);
-        mat.setColor("Specular", ColorRGBA.White);
-        mat.setFloat("Shininess", 64f);
+        Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+        mat.setBoolean("VertexColor", true);
         chunkGeom.setMaterial(mat);
 
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
