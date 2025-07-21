@@ -14,11 +14,16 @@ import com.jme3.scene.Mesh;
 import com.jme3.scene.VertexBuffer;
 import com.jme3.util.BufferUtils;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class TerrainGenerator extends SimpleApplication {
 
     BulletAppState bulletAppState;
     HeightMapGenerator heightMap;
+
+    Thread thread1;
+    Thread thread2;
 
     public static void main(String[] args) {
         TerrainGenerator app = new TerrainGenerator();
@@ -110,34 +115,45 @@ public class TerrainGenerator extends SimpleApplication {
     }
 
     private void CreateTerrain() {
-        Mesh mesh;
         int chunkSize = 200;
         float scale = 100f; // Or your preferred scale
-        int renderRadius = 2; // 1 = 3x3 grid
+        int renderRadius = 3; // Grid size will be (2 * renderRadius - 1)^2
+
+        ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
         for (int chunkZ = -renderRadius; chunkZ <= renderRadius; chunkZ++) {
             for (int chunkX = -renderRadius; chunkX <= renderRadius; chunkX++) {
+                final int finalChunkX = chunkX;
+                final int finalChunkZ = chunkZ;
 
-                try {
-                    mesh = generateChunkMesh(chunkX, chunkZ, chunkSize, scale);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                executor.submit(() -> {
+                    try {
+                        Mesh mesh = generateChunkMesh(finalChunkX, finalChunkZ, chunkSize, scale);
 
-                Geometry chunkGeom = new Geometry("Chunk_" + chunkX + "_" + chunkZ, mesh);
+                        Geometry chunkGeom = new Geometry("Chunk_" + finalChunkX + "_" + finalChunkZ, mesh);
+                        Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+                        mat.setBoolean("VertexColor", true);
+                        chunkGeom.setMaterial(mat);
 
-                Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
-                mat.setBoolean("VertexColor", true);
-                chunkGeom.setMaterial(mat);
+                        MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
+                        RigidBodyControl chunkPhysics = new RigidBodyControl(terrainShape, 0);
+                        chunkGeom.addControl(chunkPhysics);
 
-                MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
-                RigidBodyControl chunkPhysics = new RigidBodyControl(terrainShape, 0);
-                chunkGeom.addControl(chunkPhysics);
-                bulletAppState.getPhysicsSpace().add(chunkPhysics);
+                        // Enqueue scene updates on render thread
+                        enqueue(() -> {
+                            bulletAppState.getPhysicsSpace().add(chunkPhysics);
+                            rootNode.attachChild(chunkGeom);
+                            return null;
+                        });
 
-                rootNode.attachChild(chunkGeom);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
             }
         }
+
+        executor.shutdown();
     }
 
     private void setUpLight() {
