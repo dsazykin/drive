@@ -28,7 +28,7 @@ public class TerrainGenerator extends SimpleApplication {
     ChunkManager manager;
     ExecutorService executor;
 
-    int chunkSize = 16;
+    int chunkSize = 50;
     float scale = 4f;
     int renderDistance = 2; // Grid size will be (2 * renderDistance - 1)^2
 
@@ -178,6 +178,12 @@ public class TerrainGenerator extends SimpleApplication {
         }
     }
 
+    @Override
+    public void stop() {
+        executor.shutdown();
+        super.stop();
+    }
+
     private void setUpLight() {
         // We add light so we see the scene
         AmbientLight al = new AmbientLight();
@@ -222,7 +228,6 @@ public class TerrainGenerator extends SimpleApplication {
                 chunkTasks.add(future);
             }
         }
-        //executor.shutdown();
     }
 
 }
