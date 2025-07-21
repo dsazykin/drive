@@ -7,7 +7,7 @@ import javax.imageio.ImageIO;
 
 public class HeightMapGenerator {
 
-    public float[][] generateHeightmap(int width, int height, long seed, double scale)
+    public float[][] generateHeightmap(int width, int height, long seed, double scale, int chunkX, int chunkZ)
             throws IOException {
         float[][] heightmap = new float[width][height];
 
@@ -15,20 +15,20 @@ public class HeightMapGenerator {
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                double nx = x / scale;
-                double ny = y / scale;
+                // Convert local (x, y) in the chunk to world coordinates
+                double worldX = (chunkX * (width - 1) + x) / scale;
+                double worldY = (chunkZ * (height - 1) + y) / scale;
 
-                float e = 20f * OpenSimplex2.noise2(seed, 0.1f * nx, 0.1f * ny) +
-                        4f * OpenSimplex2.noise2(seed, 0.25f * nx, 0.25f * ny) +
-                        0.6f * OpenSimplex2.noise2(seed, 0.75f * nx, 0.75f * ny);
+                float e = 20f * OpenSimplex2.noise2(seed, 0.1f * worldX, 0.1f * worldY) +
+                        4f  * OpenSimplex2.noise2(seed, 0.25f * worldX, 0.25f * worldY) +
+                        0.6f * OpenSimplex2.noise2(seed, 0.75f * worldX, 0.75f * worldY);
 
                 e = e / (20f + 4f + 0.6f);
 
-                heightmap[x][y] = (float) Math.pow(e, 1f);
+                heightmap[x][y] = e;
 
+                // Visualization
                 double noiseValue = heightmap[x][y]; // range [-1,1]
-
-                // Normalize to [0,255]
                 int grayscale = (int) ((noiseValue + 1) / 2 * 255);
                 grayscale = Math.max(0, Math.min(255, grayscale));
 
@@ -37,8 +37,17 @@ public class HeightMapGenerator {
             }
         }
 
-        ImageIO.write(image, "png", new File("noise.png"));
-        System.out.println("Noise image saved as noise.png");
+        String folderPath = "generated_noise";
+        File directory = new File(folderPath);
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+
+        File outputFile = new File(directory, "noise_chunk_" + chunkX + "_" + chunkZ + ".png");
+        ImageIO.write(image, "png", outputFile);
+        System.out.println("Noise image saved to: " + outputFile.getAbsolutePath());
+
+        System.out.println("Noise image saved as noise_chunk_" + chunkX + "_" + chunkZ + ".png");
 
         return heightmap;
     }
@@ -47,14 +56,12 @@ public class HeightMapGenerator {
         HeightMapGenerator generator = new HeightMapGenerator();
 
         long seed = 1234L;
-        float[][] heightmap = generator.generateHeightmap(512, 512, seed, 50.0);
+        float[][] heightmap;
 
-        // Example: print some values
-        for (int y = 0; y < 10; y++) {
-            for (int x = 0; x < 10; x++) {
-                System.out.printf("%.2f ", heightmap[x][y]);
+        for (int x = -1; x < 2; x++) {
+            for (int z = -1; z < 2; z++) {
+                heightmap = generator.generateHeightmap(200, 200, seed, 100, x, z);
             }
-            System.out.println();
         }
     }
 }
