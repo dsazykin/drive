@@ -11,7 +11,7 @@ public class HeightMapGenerator {
             throws IOException {
         float[][] heightmap = new float[width][height];
 
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
+        //BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
@@ -28,26 +28,26 @@ public class HeightMapGenerator {
                 heightmap[x][y] = e;
 
                 // Visualization
-                double noiseValue = heightmap[x][y]; // range [-1,1]
-                int grayscale = (int) ((noiseValue + 1) / 2 * 255);
-                grayscale = Math.max(0, Math.min(255, grayscale));
-
-                int rgb = (grayscale << 16) | (grayscale << 8) | grayscale;
-                image.setRGB(x, y, rgb);
+//                double noiseValue = heightmap[x][y]; // range [-1,1]
+//                int grayscale = (int) ((noiseValue + 1) / 2 * 255);
+//                grayscale = Math.max(0, Math.min(255, grayscale));
+//
+//                int rgb = (grayscale << 16) | (grayscale << 8) | grayscale;
+//                image.setRGB(x, y, rgb);
             }
         }
 
-        String folderPath = "generated_noise";
-        File directory = new File(folderPath);
-        if (!directory.exists()) {
-            directory.mkdirs();
-        }
+//        String folderPath = "generated_noise";
+//        File directory = new File(folderPath);
+//        if (!directory.exists()) {
+//            directory.mkdirs();
+//        }
+//
+//        File outputFile = new File(directory, "noise_chunk_" + chunkX + "_" + chunkZ + ".png");
+//        ImageIO.write(image, "png", outputFile);
+//        System.out.println("Noise image saved to: " + outputFile.getAbsolutePath());
 
-        File outputFile = new File(directory, "noise_chunk_" + chunkX + "_" + chunkZ + ".png");
-        ImageIO.write(image, "png", outputFile);
-        System.out.println("Noise image saved to: " + outputFile.getAbsolutePath());
-
-        System.out.println("Noise image saved as noise_chunk_" + chunkX + "_" + chunkZ + ".png");
+        //System.out.println("Noise image saved as noise_chunk_" + chunkX + "_" + chunkZ + ".png");
 
         return heightmap;
     }
