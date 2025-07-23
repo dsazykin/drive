@@ -1,42 +1,43 @@
 package jMonkeyEngine.Terrain;
 
-import com.jme3.asset.AssetManager;
+import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.RigidBodyControl;
-import com.jme3.math.FastMath;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
-import jMonkeyEngine.Main;
+import jMonkeyEngine.Road.RoadGenerator;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 
 public class ChunkManager {
     private final Node rootNode;
     private final BulletAppState bulletAppState;
     private final TerrainGenerator generator;
-    private final Main main;
+    private final RoadGenerator road;
+    private final SimpleApplication main;
     private final ExecutorService executor;
 
     private final int chunkSize;
-    private final double scale;
+    private final float scale;
     private final int renderDistance;
     private final Set<String> loadingChunks = new HashSet<>();
 
     private final Map<String, Geometry> loadedChunks = new HashMap<>();
 
     public ChunkManager(Node rootNode, BulletAppState bulletAppState,
-                        TerrainGenerator generator, Main main, ExecutorService executor, int chunkSize,
-                        double scale, int renderDistance) {
+                        TerrainGenerator generator, RoadGenerator road, SimpleApplication main, ExecutorService executor,
+                        int chunkSize,
+                        float scale, int renderDistance) {
         this.rootNode = rootNode;
         this.bulletAppState = bulletAppState;
         this.generator = generator;
+        this.road = road;
         this.main = main;
         this.executor = executor;
         this.chunkSize = chunkSize;
@@ -71,14 +72,21 @@ public class ChunkManager {
                     loadingChunks.add(key);
                     executor.submit(() -> {
                         try {
-                            Mesh mesh = generator.generateChunkMesh(chunkX, chunkZ, chunkSize, scale);
+                            float[][] terrain = generator.generateHeightMap(chunkSize, scale, chunkX, chunkZ);
+                            Mesh mesh = generator.generateChunkMesh(terrain, chunkSize, scale);
                             Geometry chunk = generator.createGeometry(chunkX, chunkZ, mesh);
 
+                            Geometry r = road.generateStraightRoad(50,5f, 2f, terrain, 0);
                             main.enqueue(() -> {
                                 loadedChunks.put(key, chunk);
                                 loadingChunks.remove(key);
+
                                 rootNode.attachChild(chunk);
                                 bulletAppState.getPhysicsSpace().add(chunk.getControl(RigidBodyControl.class));
+
+                                r.setLocalTranslation(chunkX * (chunkSize - 1) * scale, 0, chunkZ * (chunkSize - 1) * scale);
+                                rootNode.attachChild(r);
+                                bulletAppState.getPhysicsSpace().add(r.getControl(RigidBodyControl.class));
                             });
                         } catch (IOException e) {
                             e.printStackTrace();
