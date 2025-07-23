@@ -1,6 +1,7 @@
 package jMonkeyEngine.Terrain;
 
 import com.jme3.app.SimpleApplication;
+import com.jme3.asset.AssetManager;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.collision.shapes.MeshCollisionShape;
 import com.jme3.bullet.control.RigidBodyControl;
@@ -12,8 +13,10 @@ import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
+import com.jme3.scene.Node;
 import com.jme3.scene.VertexBuffer;
 import com.jme3.util.BufferUtils;
+import jMonkeyEngine.Main;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,24 +24,41 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-public class TerrainGenerator extends SimpleApplication {
+public class TerrainGenerator{
 
-    BulletAppState bulletAppState;
-    HeightMapGenerator heightMap;
-    ChunkManager manager;
-    ExecutorService executor;
+    private final Node rootNode;
+    private final BulletAppState bulletAppState;
+    private final AssetManager assetManager;
+    private final HeightMapGenerator heightMap;
+    private ChunkManager manager;
+    private final Main main;
+    private final ExecutorService executor;
 
-    int chunkSize = 50;
-    float scale = 4f;
-    int renderDistance = 2; // Grid size will be (2 * renderDistance - 1)^2
+    private final int chunkSize;
+    private final float scale;
+    private final int renderDistance; // Grid size will be (2 * renderDistance - 1)^2
+    private final Long seed;
 
     private List<Future<?>> chunkTasks;
-    private boolean loadingDone = false;
-    private BitmapText loadingText;
 
-    public static void main(String[] args) {
-        TerrainGenerator app = new TerrainGenerator();
-        app.start();
+    public TerrainGenerator(BulletAppState bulletAppState,
+                            Node rootNode, AssetManager assetManager, Main main, ExecutorService executor, int chunkSize, float scale,
+                            int renderDistance, Long seed) {
+        this.bulletAppState = bulletAppState;
+        this.rootNode = rootNode;
+        this.assetManager = assetManager;
+        this.main = main;
+        this.executor = executor;
+        this.chunkSize = chunkSize;
+        this.scale = scale;
+        this.renderDistance = renderDistance;
+        this.seed = seed;
+
+        this.heightMap = new HeightMapGenerator();
+    }
+
+    public void setChunkManager(ChunkManager manager) {
+        this.manager = manager;
     }
 
     private float[][] generateHeightMap(int size, double scale, int chunkX, int chunkZ) throws IOException {
@@ -70,15 +90,9 @@ public class TerrainGenerator extends SimpleApplication {
                 }
                 colors[vertexIndex] = color;
 
-//                vertices[vertexIndex++] = new Vector3f(
-//                        (float) ((chunkX * (size - 1) + x) * scale), // world X coordinate
-//                        (float) (height * scale), // height
-//                        (float) ((chunkZ * (size - 1) + z) * scale) // world Z coordinate
-//                );
-
                 vertices[vertexIndex++] = new Vector3f(
                         (float) (x * (scale / 4)),
-                        (float) (height * (scale / 4)),
+                        height * 50,
                         (float) (z * (scale / 4))
                 );
 
@@ -132,76 +146,12 @@ public class TerrainGenerator extends SimpleApplication {
         return chunkGeom;
     }
 
-    @Override
-    public void simpleInitApp() {
-        bulletAppState = new BulletAppState();
-        stateManager.attach(bulletAppState);
-        executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        //bulletAppState.setDebugEnabled(true);
+//    public void simpleInitApp() {
+//        cam.setLocation(new Vector3f(32, 500, 32));
+//        cam.lookAt(Vector3f.ZERO, Vector3f.UNIT_Y);
+//    }
 
-        this.heightMap = new HeightMapGenerator();
-        this.manager =
-                new ChunkManager(rootNode, assetManager, bulletAppState, this, executor, chunkSize,
-                                 scale, renderDistance);
-
-        //viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
-        enablePlayerControls(false);
-        flyCam.setMoveSpeed(300);
-
-        loadingText = new BitmapText(guiFont, false);
-        loadingText.setSize(guiFont.getCharSet().getRenderedSize());
-        loadingText.setText("Loading terrain...");
-        loadingText.setLocalTranslation(300, 300, 0);
-        guiNode.attachChild(loadingText);
-
-        CreateTerrain();
-        setUpLight();
-
-        cam.setLocation(new Vector3f(32, 500, 32));
-        cam.lookAt(Vector3f.ZERO, Vector3f.UNIT_Y);
-    }
-
-    @Override
-    public void simpleUpdate(float tpf) {
-        if (!loadingDone && chunkTasks != null) {
-            boolean allDone = chunkTasks.stream().allMatch(Future::isDone);
-            if (allDone) {
-                loadingDone = true;
-                enqueue(() -> {
-                    enqueue(() -> guiNode.detachChild(loadingText));
-                    enablePlayerControls(true);
-                    return null;
-                });
-            }
-        } else {
-            manager.updateChunks(cam.getLocation());
-        }
-    }
-
-    @Override
-    public void stop() {
-        executor.shutdown();
-        super.stop();
-    }
-
-    private void setUpLight() {
-        // We add light so we see the scene
-        AmbientLight al = new AmbientLight();
-        al.setColor(ColorRGBA.White.mult(1.3f));
-        rootNode.addLight(al);
-
-        DirectionalLight dl = new DirectionalLight();
-        dl.setColor(ColorRGBA.White);
-        dl.setDirection(new Vector3f(2.8f, -2.8f, -2.8f).normalizeLocal());
-        rootNode.addLight(dl);
-    }
-
-    private void enablePlayerControls(boolean enabled) {
-        flyCam.setEnabled(enabled);
-        inputManager.setCursorVisible(!enabled);
-    }
-
-    private void CreateTerrain() {
+    public void CreateTerrain() {
         chunkTasks = new ArrayList<>();
 
         for (int chunkZ = -renderDistance; chunkZ <= renderDistance; chunkZ++) {
@@ -214,7 +164,7 @@ public class TerrainGenerator extends SimpleApplication {
                         Mesh mesh = generateChunkMesh(finalChunkX, finalChunkZ, chunkSize, scale);
                         Geometry chunkGeom = createGeometry(finalChunkX, finalChunkZ, mesh);
 
-                        enqueue(() -> {
+                        main.enqueue(() -> {
                             manager.addChunk(finalChunkX, finalChunkZ, chunkGeom);
                             rootNode.attachChild(chunkGeom);
                             bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
@@ -230,4 +180,7 @@ public class TerrainGenerator extends SimpleApplication {
         }
     }
 
+    public List<Future<?>> getChunkTasks() {
+        return chunkTasks;
+    }
 }

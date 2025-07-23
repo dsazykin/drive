@@ -8,6 +8,7 @@ import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
+import jMonkeyEngine.Main;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -18,25 +19,25 @@ import java.util.concurrent.Future;
 
 public class ChunkManager {
     private final Node rootNode;
-    private final AssetManager assetManager;
     private final BulletAppState bulletAppState;
     private final TerrainGenerator generator;
-    ExecutorService executor;
+    private final Main main;
+    private final ExecutorService executor;
 
     private final int chunkSize;
     private final double scale;
     private final int renderDistance;
-    private Set<String> loadingChunks = new HashSet<>();
+    private final Set<String> loadingChunks = new HashSet<>();
 
     private final Map<String, Geometry> loadedChunks = new HashMap<>();
 
-    public ChunkManager(Node rootNode, AssetManager assetManager, BulletAppState bulletAppState,
-                        TerrainGenerator generator, ExecutorService executor, int chunkSize,
+    public ChunkManager(Node rootNode, BulletAppState bulletAppState,
+                        TerrainGenerator generator, Main main, ExecutorService executor, int chunkSize,
                         double scale, int renderDistance) {
         this.rootNode = rootNode;
-        this.assetManager = assetManager;
         this.bulletAppState = bulletAppState;
         this.generator = generator;
+        this.main = main;
         this.executor = executor;
         this.chunkSize = chunkSize;
         this.scale = scale;
@@ -68,13 +69,12 @@ public class ChunkManager {
 
                 if (!loadedChunks.containsKey(key) && !loadingChunks.contains(key)) {
                     loadingChunks.add(key);
-                    System.out.println("Loading chunk: " + key);
                     executor.submit(() -> {
                         try {
                             Mesh mesh = generator.generateChunkMesh(chunkX, chunkZ, chunkSize, scale);
                             Geometry chunk = generator.createGeometry(chunkX, chunkZ, mesh);
 
-                            generator.enqueue(() -> {
+                            main.enqueue(() -> {
                                 loadedChunks.put(key, chunk);
                                 loadingChunks.remove(key);
                                 rootNode.attachChild(chunk);
@@ -91,7 +91,6 @@ public class ChunkManager {
         // Unload chunks that are no longer needed
         loadedChunks.entrySet().removeIf(entry -> {
             if (!neededChunks.contains(entry.getKey())) {
-                System.out.println("Unloading chunk: " + entry.getKey());
                 Geometry chunk = entry.getValue();
                 chunk.removeFromParent();
                 bulletAppState.getPhysicsSpace().remove(chunk);
