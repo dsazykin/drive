@@ -3,16 +3,14 @@ package jMonkeyEngine.Terrain;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.RigidBodyControl;
+import com.jme3.math.Vector2f;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import jMonkeyEngine.Road.RoadGenerator;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 
 public class ChunkManager {
@@ -76,7 +74,15 @@ public class ChunkManager {
                             Mesh mesh = generator.generateChunkMesh(terrain, chunkSize, scale);
                             Geometry chunk = generator.createGeometry(chunkX, chunkZ, mesh);
 
-                            Geometry r = road.generateStraightRoad(50,5f, 2f, terrain, 0);
+//                            Geometry r;
+//                            if (chunkX == 0) {
+//                                int zOffSet = (int) (chunkZ * ((chunkSize - 1) * (scale / 4)));
+//                                r = road.generateStraightRoad(50, 10f, 10f, terrain, zOffSet);
+//                                System.out.println("generated road");
+//                            } else {
+//                                r = null;
+//                            }
+
                             main.enqueue(() -> {
                                 loadedChunks.put(key, chunk);
                                 loadingChunks.remove(key);
@@ -84,9 +90,42 @@ public class ChunkManager {
                                 rootNode.attachChild(chunk);
                                 bulletAppState.getPhysicsSpace().add(chunk.getControl(RigidBodyControl.class));
 
-                                r.setLocalTranslation(chunkX * (chunkSize - 1) * scale, 0, chunkZ * (chunkSize - 1) * scale);
-                                rootNode.attachChild(r);
-                                bulletAppState.getPhysicsSpace().add(r.getControl(RigidBodyControl.class));
+//                                if (chunkX == 0) {
+//                                    rootNode.attachChild(r);
+//                                    bulletAppState.getPhysicsSpace()
+//                                            .add(r.getControl(RigidBodyControl.class));
+//                                    System.out.println("Attaching road at Z = " + (chunkZ * chunkSize * (scale / 4f)));
+//                                }
+
+                                Geometry r;
+                                if (chunkX == 0 && chunkZ == 0) {
+                                    road.generateInitialPath();
+                                }
+
+                                // Only extend path if necessary
+                                Vector2f chunkCenter = generator.getChunkCenter(chunkX, chunkZ, chunkSize * (scale / 4));
+                                while (road.furthestPoint().distance(chunkCenter) < 500 * 1.5f) {
+                                    road.extendPath();
+                                }
+
+                                // Now fetch road points
+                                List<Vector2f>
+                                        roadPoints = road.getPointsInChunk(chunkX, chunkZ, (int) (chunkSize * (scale / 4)));
+
+                                if (roadPoints.size() >= 2) {
+                                    r = road.buildRoad(roadPoints, 10f, terrain);
+                                } else {
+                                    r = null;
+                                }
+
+                                if (r != null) {
+                                    rootNode.attachChild(r);
+                                    bulletAppState.getPhysicsSpace()
+                                            .add(r.getControl(RigidBodyControl.class));
+                                    System.out.println("Attaching road at Z = " +
+                                                               (chunkZ * chunkSize *
+                                                                       (scale / 4f)));
+                                }
                             });
                         } catch (IOException e) {
                             e.printStackTrace();
