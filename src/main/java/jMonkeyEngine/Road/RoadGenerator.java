@@ -32,7 +32,8 @@ public class RoadGenerator extends SimpleApplication {
 
     private List<Vector2f> pathPoints = new ArrayList<>();
     private float segmentLength = 5f;
-    private float currentAngle = 0f; // in degrees
+    private float currentAngle = 0f;
+    private float turnVelocity = 0f;// in degrees
     private Vector2f currentPosition = new Vector2f(0, 0);
 
     private Random rand = new Random();
@@ -148,31 +149,6 @@ public class RoadGenerator extends SimpleApplication {
         return road;
     }
 
-    private List<Vector2f> generateCurvedPath(Vector2f start, int segments, float segmentLength, float maxTurnRateDeg) {
-        List<Vector2f> path = new ArrayList<>();
-        path.add(start);
-
-        float angle = 0f; // Initial forward direction
-        Random rand = new Random();
-
-        float turnVelocity = 0f;
-
-        for (int i = 1; i < segments; i++) {
-            // Gradual change to turning rate (simulate inertia)
-            float targetTurn = (rand.nextFloat() * 2 - 1) * maxTurnRateDeg;
-            turnVelocity += (targetTurn - turnVelocity) * 0.05f;  // smooth it
-            angle += FastMath.DEG_TO_RAD * turnVelocity;
-
-            float dx = FastMath.cos(angle) * segmentLength;
-            float dz = FastMath.sin(angle) * segmentLength;
-
-            Vector2f prev = path.get(i - 1);
-            path.add(prev.add(new Vector2f(dx, dz)));
-        }
-
-        return path;
-    }
-
     public void generateInitialPath() {
         while (furthestPoint().distance(new Vector2f(0, 0)) < 500 * 2.5f) {
             extendPath();
@@ -180,30 +156,27 @@ public class RoadGenerator extends SimpleApplication {
     }
 
     public void extendPath() {
-        Vector2f last = pathPoints.get(pathPoints.size() - 1);
-        Vector2f dir;
+        boolean rightDirection = false;
+        Vector2f next = null;
+        while (!rightDirection) {
+            Vector2f last = pathPoints.get(pathPoints.size() - 1);
 
-        // If path has more than 1 point, compute direction
-        if (pathPoints.size() >= 2) {
-            dir = last.subtract(pathPoints.get(pathPoints.size() - 2)).normalize();
-        } else {
-            dir = new Vector2f(0, 1); // default forward (Z+) if only one point
+            // Random target turn in degrees, smoothed over time
+            float targetTurnDeg = (rand.nextFloat() * 2 - 1) * maxTurnAngle;
+            turnVelocity += (targetTurnDeg - turnVelocity) * 0.05f;  // Inertia-like smoothing
+
+            // Update current direction angle
+            currentAngle += FastMath.DEG_TO_RAD * turnVelocity;
+
+            // Compute new offset
+            float dx = FastMath.cos(currentAngle) * segmentLength;
+            float dz = FastMath.sin(currentAngle) * segmentLength;
+
+            next = last.add(new Vector2f(dx, dz));
+            if (next.getY() > last.getY()) {
+                rightDirection = true;
+            }
         }
-
-        // Slight random angle in radians
-        float angleDeg = -maxTurnAngle + rand.nextFloat() * (2 * maxTurnAngle);
-        float angleRad = FastMath.DEG_TO_RAD * angleDeg;
-
-        // Rotate direction
-        float cos = FastMath.cos(angleRad);
-        float sin = FastMath.sin(angleRad);
-        Vector2f rotated = new Vector2f(
-                dir.x * cos - dir.y * sin,
-                dir.x * sin + dir.y * cos
-        ).normalize();
-
-        // Compute new point
-        Vector2f next = last.add(rotated.mult(segmentLength));
         pathPoints.add(next);
     }
 
