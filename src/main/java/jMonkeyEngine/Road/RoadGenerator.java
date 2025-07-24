@@ -15,9 +15,11 @@ import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.VertexBuffer;
 import com.jme3.util.BufferUtils;
-import jMonkeyEngine.Terrain.ChunkManager;
+import jMonkeyEngine.Chunks.ChunkCoord;
+import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -31,13 +33,14 @@ public class RoadGenerator extends SimpleApplication {
     ChunkManager manager;
 
     private List<Vector2f> pathPoints = new ArrayList<>();
-    private float segmentLength = 5f;
+    private final float segmentLength = 10f;
     private float currentAngle = 0f;
     private float turnVelocity = 0f;// in degrees
     private Vector2f currentPosition = new Vector2f(0, 0);
+    private HashMap<ChunkCoord, RoadEndpoint> exitPointMap = new HashMap<>();
 
     private Random rand = new Random();
-    private float maxTurnAngle = 10f;
+    private final float maxTurnAngle = 10f;
     private float minTurnAngle = -15f;
 
     public static void main(String[] args) {
@@ -196,9 +199,23 @@ public class RoadGenerator extends SimpleApplication {
     }
 
     public Geometry buildRoad(List<Vector2f> path, float width, float[][] terrain, int chunkX, int chunkZ, int chunkSize, float scale) {
-        Vector3f[] vertices = new Vector3f[path.size() * 2];
-        ColorRGBA[] colors = new ColorRGBA[vertices.length];
-        int[] indices = new int[(path.size() - 1) * 6];
+        ChunkCoord prevChunk = getPrevChunk(path.get(0), path.get(1), chunkSize, scale);
+        System.out.println("suspected previous chunk: " + prevChunk);
+        RoadEndpoint entry = exitPointMap.get(prevChunk);
+
+        boolean notFirst = (entry != null);
+        System.out.println(notFirst);
+
+        int extraVerts = notFirst ? 2 : 0;
+        int vertexCount = path.size() * 2 + extraVerts;
+        Vector3f[] vertices = new Vector3f[vertexCount];
+        ColorRGBA[] colors = new ColorRGBA[vertexCount];
+
+        if (notFirst) {
+            vertices[0] = entry.left;
+            vertices[1] = entry.right;
+            colors[0] = colors[1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
+        }
 
         for (int i = 0; i < path.size(); i++) {
             Vector2f center = path.get(i);
@@ -206,27 +223,37 @@ public class RoadGenerator extends SimpleApplication {
             Vector2f dir;
             if (i < path.size() - 1)
                 dir = path.get(i + 1).subtract(center).normalize();
-            else
+            else if (i > 0)
                 dir = center.subtract(path.get(i - 1)).normalize();
+            else
+                dir = new Vector2f(1, 0); // fallback if path has only one point
 
             Vector2f left2D = new Vector2f(-dir.y, dir.x).mult(width / 2f);
             Vector2f leftPt = center.add(left2D);
             Vector2f rightPt = center.subtract(left2D);
 
-            // Sample center height
             float centerHeight = sampleHeight(center, terrain, chunkX, chunkZ, chunkSize, scale);
-
-            // Slight offset above the terrain
             float heightOffset = 0.05f;
 
-            vertices[i * 2] = new Vector3f(leftPt.x, centerHeight + heightOffset, leftPt.y);
-            vertices[i * 2 + 1] = new Vector3f(rightPt.x, centerHeight + heightOffset, rightPt.y);
+            Vector3f leftVector = new Vector3f(leftPt.x, centerHeight + heightOffset, leftPt.y);
+            Vector3f rightVector = new Vector3f(rightPt.x, centerHeight + heightOffset, rightPt.y);
 
-            colors[i * 2] = colors[i * 2 + 1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
+            int vi = i * 2 + extraVerts;
+            vertices[vi] = leftVector;
+            vertices[vi + 1] = rightVector;
+            colors[vi] = colors[vi + 1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
+
+            // Save for next chunk to continue from here
+            if (i == path.size() - 1) {
+                exitPointMap.put(new ChunkCoord(chunkX, chunkZ), new RoadEndpoint(leftVector, rightVector));
+            }
         }
 
+        int segmentCount = path.size() - 1 + (notFirst ? 1 : 0);
+        int[] indices = new int[segmentCount * 6];
+
         int idx = 0;
-        for (int i = 0; i < path.size() - 1; i++) {
+        for (int i = 0; i < segmentCount; i++) {
             int v0 = i * 2;
             int v1 = v0 + 1;
             int v2 = v0 + 2;
@@ -277,5 +304,17 @@ public class RoadGenerator extends SimpleApplication {
     public Vector2f furthestPoint() {
         if (pathPoints.isEmpty()) return new Vector2f(0, 0); // Or null, or throw an exception
         return pathPoints.get(pathPoints.size() - 1);
+    }
+
+    private ChunkCoord getPrevChunk(Vector2f first, Vector2f second, int chunkSize, float scale) {
+        Vector2f direction = first.subtract(second).normalize();
+
+        float approxStepSize = first.distance(second);
+        Vector2f previousPos = first.add(direction.mult(approxStepSize));
+
+        int prevChunkX = (int) Math.floor(previousPos.x / (chunkSize * (scale / 4)));
+        int prevChunkZ = (int) Math.floor(previousPos.y / (chunkSize * (scale / 4)));
+
+        return new ChunkCoord(prevChunkX, prevChunkZ);
     }
 }

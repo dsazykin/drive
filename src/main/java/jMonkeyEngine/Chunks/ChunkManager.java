@@ -1,4 +1,4 @@
-package jMonkeyEngine.Terrain;
+package jMonkeyEngine.Chunks;
 
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
@@ -9,7 +9,7 @@ import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import jMonkeyEngine.Road.RoadGenerator;
-import java.io.IOException;
+import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 
@@ -113,6 +113,9 @@ public class ChunkManager {
                                         roadPoints = road.getPointsInChunk(chunkX, chunkZ, (int) (chunkSize * (scale / 4)));
 
                                 if (roadPoints.size() >= 2) {
+                                    System.out.println("chunk: (" + chunkX + ", " + chunkZ + ")");
+                                    System.out.println("first point in chunk: " + roadPoints.get(0));
+                                    System.out.println("last point in chunk: " + roadPoints.get(roadPoints.size() - 1));
                                     r = road.buildRoad(roadPoints, 10f, terrain, chunkX, chunkZ, chunkSize, scale);
                                 } else {
                                     r = null;

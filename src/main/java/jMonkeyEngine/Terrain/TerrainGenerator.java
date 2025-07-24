@@ -14,6 +14,7 @@ import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import com.jme3.scene.VertexBuffer;
 import com.jme3.util.BufferUtils;
+import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Road.RoadGenerator;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -64,7 +65,7 @@ public class TerrainGenerator{
         return heightMap.generateHeightmap(size, size, seed, scale, chunkX, chunkZ);
     }
 
-    protected Mesh generateChunkMesh(float[][] terrain, int size, double scale)
+    public Mesh generateChunkMesh(float[][] terrain, int size, double scale)
             throws IOException {
         Mesh mesh = new Mesh();
 
@@ -124,16 +125,16 @@ public class TerrainGenerator{
         return mesh;
     }
 
-    protected Geometry createGeometry(int chunkX, int chunkZ, Mesh mesh) {
+    public Geometry createGeometry(int chunkX, int chunkZ, Mesh mesh) {
         Geometry chunkGeom = new Geometry("Chunk_" + chunkX + "_" + chunkZ, mesh);
         Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         mat.setBoolean("VertexColor", true);
         chunkGeom.setMaterial(mat);
 
         chunkGeom.setLocalTranslation(
-                chunkX * (chunkSize - 1f) * (scale / 4),
+                chunkX * (chunkSize - 0.9f) * (scale / 4),
                 0,
-                chunkZ * (chunkSize - 1f) * (scale / 4)
+                chunkZ * (chunkSize - 0.9f) * (scale / 4)
         );
 
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
@@ -194,6 +195,9 @@ public class TerrainGenerator{
                             List<Vector2f> roadPoints = road.getPointsInChunk(finalChunkX, finalChunkZ, (int) (chunkSize * (scale / 4)));
 
                             if (roadPoints.size() >= 2) {
+                                System.out.println("chunk: (" + finalChunkX + ", " + finalChunkZ + ")");
+                                System.out.println("first point in chunk: " + roadPoints.get(0));
+                                System.out.println("last point in chunk: " + roadPoints.get(roadPoints.size() - 1));
                                 r = road.buildRoad(roadPoints, 10f, terrain, finalChunkX, finalChunkZ, chunkSize, scale);
                             } else {
                                 r = null;
@@ -220,7 +224,7 @@ public class TerrainGenerator{
         return chunkTasks;
     }
 
-    Vector2f getChunkCenter(int chunkX, int chunkZ, float chunkSize) {
+    public Vector2f getChunkCenter(int chunkX, int chunkZ, float chunkSize) {
         float centerX = chunkX * chunkSize + chunkSize / 2f;
         float centerZ = chunkZ * chunkSize + chunkSize / 2f;
         return new Vector2f(centerX, centerZ);
