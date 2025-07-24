@@ -37,7 +37,7 @@ public class RoadGenerator extends SimpleApplication {
     private Vector2f currentPosition = new Vector2f(0, 0);
 
     private Random rand = new Random();
-    private float maxTurnAngle = 15f;
+    private float maxTurnAngle = 10f;
     private float minTurnAngle = -15f;
 
     public static void main(String[] args) {
