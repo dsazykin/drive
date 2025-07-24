@@ -157,7 +157,6 @@ public class TerrainGenerator{
                         Mesh mesh = generateChunkMesh(terrain, chunkSize, scale);
                         Geometry chunkGeom = createGeometry(finalChunkX, finalChunkZ, mesh);
 
-                        System.out.println("generated chunk");
 
                         int zOffSet = (int) (finalChunkZ * ((chunkSize - 1) * (scale / 4)));
                         int xOffSet = (int) (finalChunkX * ((chunkSize - 1) * (scale / 4)));
@@ -172,7 +171,6 @@ public class TerrainGenerator{
                             manager.addChunk(finalChunkX, finalChunkZ, chunkGeom);
                             rootNode.attachChild(chunkGeom);
                             bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
-                            System.out.println("attached chunk");
 
 //                            if (finalChunkX == 0) {
 //                                rootNode.attachChild(r);
@@ -196,7 +194,7 @@ public class TerrainGenerator{
                             List<Vector2f> roadPoints = road.getPointsInChunk(finalChunkX, finalChunkZ, (int) (chunkSize * (scale / 4)));
 
                             if (roadPoints.size() >= 2) {
-                                r = road.buildRoad(roadPoints, 10f, terrain);
+                                r = road.buildRoad(roadPoints, 10f, terrain, finalChunkX, finalChunkZ, chunkSize, scale);
                             } else {
                                 r = null;
                             }
@@ -205,9 +203,6 @@ public class TerrainGenerator{
                                 rootNode.attachChild(r);
                                 bulletAppState.getPhysicsSpace()
                                         .add(r.getControl(RigidBodyControl.class));
-                                System.out.println("Attaching road at Z = " +
-                                                           (finalChunkZ * chunkSize *
-                                                                   (scale / 4f)));
                             }
                             return null;
                         });

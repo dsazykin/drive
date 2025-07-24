@@ -113,7 +113,7 @@ public class ChunkManager {
                                         roadPoints = road.getPointsInChunk(chunkX, chunkZ, (int) (chunkSize * (scale / 4)));
 
                                 if (roadPoints.size() >= 2) {
-                                    r = road.buildRoad(roadPoints, 10f, terrain);
+                                    r = road.buildRoad(roadPoints, 10f, terrain, chunkX, chunkZ, chunkSize, scale);
                                 } else {
                                     r = null;
                                 }
@@ -122,12 +122,9 @@ public class ChunkManager {
                                     rootNode.attachChild(r);
                                     bulletAppState.getPhysicsSpace()
                                             .add(r.getControl(RigidBodyControl.class));
-                                    System.out.println("Attaching road at Z = " +
-                                                               (chunkZ * chunkSize *
-                                                                       (scale / 4f)));
                                 }
                             });
-                        } catch (IOException e) {
+                        } catch (Exception e) {
                             e.printStackTrace();
                         }
                     });

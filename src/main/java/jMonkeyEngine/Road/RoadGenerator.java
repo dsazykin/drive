@@ -31,7 +31,7 @@ public class RoadGenerator extends SimpleApplication {
     ChunkManager manager;
 
     private List<Vector2f> pathPoints = new ArrayList<>();
-    private float segmentLength = 10f;
+    private float segmentLength = 5f;
     private float currentAngle = 0f; // in degrees
     private Vector2f currentPosition = new Vector2f(0, 0);
 
@@ -222,7 +222,7 @@ public class RoadGenerator extends SimpleApplication {
         return segment;
     }
 
-    public Geometry buildRoad(List<Vector2f> path, float width, float[][] terrain) {
+    public Geometry buildRoad(List<Vector2f> path, float width, float[][] terrain, int chunkX, int chunkZ, int chunkSize, float scale) {
         Vector3f[] vertices = new Vector3f[path.size() * 2];
         ColorRGBA[] colors = new ColorRGBA[vertices.length];
         int[] indices = new int[(path.size() - 1) * 6];
@@ -230,27 +230,24 @@ public class RoadGenerator extends SimpleApplication {
         for (int i = 0; i < path.size(); i++) {
             Vector2f center = path.get(i);
 
-            // Direction vector (2D)
             Vector2f dir;
             if (i < path.size() - 1)
                 dir = path.get(i + 1).subtract(center).normalize();
             else
                 dir = center.subtract(path.get(i - 1)).normalize();
 
-            // Perpendicular (left) vector in 2D
             Vector2f left2D = new Vector2f(-dir.y, dir.x).mult(width / 2f);
-
-            // Left and right points in 2D
             Vector2f leftPt = center.add(left2D);
             Vector2f rightPt = center.subtract(left2D);
 
-            // Sample terrain height
-            float leftHeight = sampleHeight(leftPt, terrain);
-            float rightHeight = sampleHeight(rightPt, terrain);
+            // Sample center height
+            float centerHeight = sampleHeight(center, terrain, chunkX, chunkZ, chunkSize, scale);
 
-            // Build 3D vertices (x, y=height, z)
-            vertices[i * 2] = new Vector3f(leftPt.x, leftHeight + 0.05f, leftPt.y);
-            vertices[i * 2 + 1] = new Vector3f(rightPt.x, rightHeight + 0.05f, rightPt.y);
+            // Slight offset above the terrain
+            float heightOffset = 0.05f;
+
+            vertices[i * 2] = new Vector3f(leftPt.x, centerHeight + heightOffset, leftPt.y);
+            vertices[i * 2 + 1] = new Vector3f(rightPt.x, centerHeight + heightOffset, rightPt.y);
 
             colors[i * 2] = colors[i * 2 + 1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
         }
@@ -284,20 +281,24 @@ public class RoadGenerator extends SimpleApplication {
         RigidBodyControl rb = new RigidBodyControl(new MeshCollisionShape(mesh), 0);
         road.addControl(rb);
 
-        System.out.println("created road at: ");
-
         return road;
     }
 
-    private float sampleHeight(Vector2f pos, float[][] terrain) {
-        int x = Math.round(pos.x);
-        int z = Math.round(pos.y);
+    private float sampleHeight(Vector2f pos, float[][] terrain, int chunkX, int chunkZ, int chunkSize, float scale) {
+        float chunkOriginX = chunkX * chunkSize * (scale / 4);
+        float chunkOriginZ = chunkZ * chunkSize * (scale / 4);
+
+        // Convert world coordinates to local heightmap indices
+        int localX = Math.round((pos.x - chunkOriginX) / (scale / 4));
+        int localZ = Math.round((pos.y - chunkOriginZ) / (scale / 4));
 
         // Clamp to terrain bounds
-        x = Math.max(0, Math.min(terrain.length - 1, x));
-        z = Math.max(0, Math.min(terrain[0].length - 1, z));
+        localX = Math.max(0, Math.min(terrain.length - 1, localX));
+        localZ = Math.max(0, Math.min(terrain[0].length - 1, localZ));
 
-        return terrain[x][z] * 50f; // scale height if needed
+        float rawHeight = terrain[localX][localZ];
+
+        return rawHeight * 50f;
     }
 
     public Vector2f furthestPoint() {
