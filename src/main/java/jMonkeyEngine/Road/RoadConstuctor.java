@@ -29,8 +29,7 @@ public class RoadConstuctor {
     private final AssetManager assetManager;
 
     private ConcurrentHashMap<ChunkCoord, RoadEndpoint> exitPointMap = new ConcurrentHashMap<>();
-    private List<DeferredConnection> unsyncedList = new ArrayList<>();
-    private List<DeferredConnection> deferredJoins = Collections.synchronizedList(unsyncedList);
+    private List<DeferredConnection> deferredJoins = Collections.synchronizedList(new ArrayList<>());
 
     public RoadConstuctor(int chunkSize, float scale, float roadWidth, Node rootNode,
                           BulletAppState bulletAppState, AssetManager assetManager) {

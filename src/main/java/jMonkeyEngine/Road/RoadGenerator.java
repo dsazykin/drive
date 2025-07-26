@@ -30,8 +30,7 @@ public class RoadGenerator extends SimpleApplication {
     ChunkManager manager;
     RoadConstuctor constuctor;
 
-    private List<Vector2f> unsyncedList = new ArrayList<>();
-    private List<Vector2f> pathPoints = Collections.synchronizedList(unsyncedList);
+    private List<Vector2f> pathPoints = Collections.synchronizedList(new ArrayList<>());
     private final float segmentLength = 10f;
     private float currentAngle = 0f;
     private float turnVelocity = 0f;// in degrees
@@ -39,7 +38,6 @@ public class RoadGenerator extends SimpleApplication {
 
     private Random rand = new Random();
     private final float maxTurnAngle = 10f;
-    private float minTurnAngle = -15f;
 
     private final int CHUNK_SIZE = 50;
     private final float SCALE = 40f;
