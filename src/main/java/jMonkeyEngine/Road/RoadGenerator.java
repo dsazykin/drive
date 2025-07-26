@@ -18,10 +18,7 @@ import com.jme3.util.BufferUtils;
 import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Terrain.TerrainGenerator;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -31,17 +28,23 @@ public class RoadGenerator extends SimpleApplication {
 
     TerrainGenerator generator;
     ChunkManager manager;
+    RoadConstuctor constuctor;
 
-    private List<Vector2f> pathPoints = new ArrayList<>();
+    private List<Vector2f> unsyncedList = new ArrayList<>();
+    private List<Vector2f> pathPoints = Collections.synchronizedList(unsyncedList);
     private final float segmentLength = 10f;
     private float currentAngle = 0f;
     private float turnVelocity = 0f;// in degrees
     private Vector2f currentPosition = new Vector2f(0, 0);
-    private HashMap<ChunkCoord, RoadEndpoint> exitPointMap = new HashMap<>();
 
     private Random rand = new Random();
     private final float maxTurnAngle = 10f;
     private float minTurnAngle = -15f;
+
+    private final int CHUNK_SIZE = 50;
+    private final float SCALE = 40f;
+
+    private final float ROAD_WIDTH = 10f;
 
     public static void main(String[] args) {
         RoadGenerator app = new RoadGenerator();
@@ -68,6 +71,7 @@ public class RoadGenerator extends SimpleApplication {
                 new ChunkManager(rootNode, bulletAppState, generator, this, this, executor, 50,
                                  40, 3);
         generator.setChunkManager(manager);
+        this.constuctor = new RoadConstuctor(CHUNK_SIZE, SCALE, ROAD_WIDTH, rootNode, bulletAppState, assetManager);
 
         setUpLight();
         generator.CreateTerrain();
@@ -79,10 +83,10 @@ public class RoadGenerator extends SimpleApplication {
         cam.lookAt(Vector3f.ZERO, Vector3f.UNIT_Y);
     }
 
-    @Override
-    public void simpleUpdate(float tpf) {
-        manager.updateChunks(cam.getLocation());
-    }
+//    @Override
+//    public void simpleUpdate(float tpf) {
+//        manager.updateChunks(cam.getLocation());
+//    }
 
     private void setUpLight() {
         // We add light so we see the scene
@@ -183,10 +187,10 @@ public class RoadGenerator extends SimpleApplication {
         pathPoints.add(next);
     }
 
-    public List<Vector2f> getPointsInChunk(int chunkX, int chunkZ, int chunkSize) {
-        float startX = chunkX * chunkSize;
+    public List<Vector2f> getPointsInChunk(ChunkCoord chunk, int chunkSize) {
+        float startX = chunk.x * chunkSize;
         float endX = startX + chunkSize;
-        float startZ = chunkZ * chunkSize;
+        float startZ = chunk.z * chunkSize;
         float endZ = startZ + chunkSize;
 
         List<Vector2f> segment = new ArrayList<>();
@@ -198,123 +202,44 @@ public class RoadGenerator extends SimpleApplication {
         return segment;
     }
 
-    public Geometry buildRoad(List<Vector2f> path, float width, float[][] terrain, int chunkX, int chunkZ, int chunkSize, float scale) {
-        ChunkCoord prevChunk = getPrevChunk(path.get(0), path.get(1), chunkSize, scale);
-        System.out.println("suspected previous chunk: " + prevChunk);
-        RoadEndpoint entry = exitPointMap.get(prevChunk);
-
-        boolean notFirst = (entry != null);
-        System.out.println(notFirst);
-
-        int extraVerts = notFirst ? 2 : 0;
-        int vertexCount = path.size() * 2 + extraVerts;
-        Vector3f[] vertices = new Vector3f[vertexCount];
-        ColorRGBA[] colors = new ColorRGBA[vertexCount];
-
-        if (notFirst) {
-            vertices[0] = entry.left;
-            vertices[1] = entry.right;
-            colors[0] = colors[1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
-        }
-
-        for (int i = 0; i < path.size(); i++) {
-            Vector2f center = path.get(i);
-
-            Vector2f dir;
-            if (i < path.size() - 1)
-                dir = path.get(i + 1).subtract(center).normalize();
-            else if (i > 0)
-                dir = center.subtract(path.get(i - 1)).normalize();
-            else
-                dir = new Vector2f(1, 0); // fallback if path has only one point
-
-            Vector2f left2D = new Vector2f(-dir.y, dir.x).mult(width / 2f);
-            Vector2f leftPt = center.add(left2D);
-            Vector2f rightPt = center.subtract(left2D);
-
-            float centerHeight = sampleHeight(center, terrain, chunkX, chunkZ, chunkSize, scale);
-            float heightOffset = 0.05f;
-
-            Vector3f leftVector = new Vector3f(leftPt.x, centerHeight + heightOffset, leftPt.y);
-            Vector3f rightVector = new Vector3f(rightPt.x, centerHeight + heightOffset, rightPt.y);
-
-            int vi = i * 2 + extraVerts;
-            vertices[vi] = leftVector;
-            vertices[vi + 1] = rightVector;
-            colors[vi] = colors[vi + 1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
-
-            // Save for next chunk to continue from here
-            if (i == path.size() - 1) {
-                exitPointMap.put(new ChunkCoord(chunkX, chunkZ), new RoadEndpoint(leftVector, rightVector));
-            }
-        }
-
-        int segmentCount = path.size() - 1 + (notFirst ? 1 : 0);
-        int[] indices = new int[segmentCount * 6];
-
-        int idx = 0;
-        for (int i = 0; i < segmentCount; i++) {
-            int v0 = i * 2;
-            int v1 = v0 + 1;
-            int v2 = v0 + 2;
-            int v3 = v0 + 3;
-
-            indices[idx++] = v0;
-            indices[idx++] = v2;
-            indices[idx++] = v1;
-            indices[idx++] = v1;
-            indices[idx++] = v2;
-            indices[idx++] = v3;
-        }
-
-        Mesh mesh = new Mesh();
-        mesh.setBuffer(VertexBuffer.Type.Position, 3, BufferUtils.createFloatBuffer(vertices));
-        mesh.setBuffer(VertexBuffer.Type.Index, 3, BufferUtils.createIntBuffer(indices));
-        mesh.setBuffer(VertexBuffer.Type.Color, 4, BufferUtils.createFloatBuffer(colors));
-        mesh.updateBound();
-
-        Geometry road = new Geometry("Road", mesh);
-        Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
-        mat.setBoolean("VertexColor", true);
-        road.setMaterial(mat);
-
-        RigidBodyControl rb = new RigidBodyControl(new MeshCollisionShape(mesh), 0);
-        road.addControl(rb);
-
-        return road;
-    }
-
-    private float sampleHeight(Vector2f pos, float[][] terrain, int chunkX, int chunkZ, int chunkSize, float scale) {
-        float chunkOriginX = chunkX * chunkSize * (scale / 4);
-        float chunkOriginZ = chunkZ * chunkSize * (scale / 4);
-
-        // Convert world coordinates to local heightmap indices
-        int localX = Math.round((pos.x - chunkOriginX) / (scale / 4));
-        int localZ = Math.round((pos.y - chunkOriginZ) / (scale / 4));
-
-        // Clamp to terrain bounds
-        localX = Math.max(0, Math.min(terrain.length - 1, localX));
-        localZ = Math.max(0, Math.min(terrain[0].length - 1, localZ));
-
-        float rawHeight = terrain[localX][localZ];
-
-        return rawHeight * 50f;
-    }
-
     public Vector2f furthestPoint() {
         if (pathPoints.isEmpty()) return new Vector2f(0, 0); // Or null, or throw an exception
         return pathPoints.get(pathPoints.size() - 1);
     }
 
-    private ChunkCoord getPrevChunk(Vector2f first, Vector2f second, int chunkSize, float scale) {
-        Vector2f direction = first.subtract(second).normalize();
+    public List<Geometry> buildRoad(ChunkCoord chunk, float[][] terrain) {
+        List<Geometry> roads;
+        if (chunk.x == 0 && chunk.z == 0) {
+            generateInitialPath();
+        }
 
-        float approxStepSize = first.distance(second);
-        Vector2f previousPos = first.add(direction.mult(approxStepSize));
+        // Only extend path if necessary
+        Vector2f chunkCenter = getChunkCenter(chunk, CHUNK_SIZE * (SCALE / 4));
+        while (furthestPoint().distance(chunkCenter) < (CHUNK_SIZE * (SCALE / 4)) * 1.5f) {
+            extendPath();
+        }
 
-        int prevChunkX = (int) Math.floor(previousPos.x / (chunkSize * (scale / 4)));
-        int prevChunkZ = (int) Math.floor(previousPos.y / (chunkSize * (scale / 4)));
+        // Now fetch road points
+        List<Vector2f> roadPoints = getPointsInChunk(chunk, (int) (CHUNK_SIZE * (SCALE / 4)));
 
-        return new ChunkCoord(prevChunkX, prevChunkZ);
+        if (roadPoints.size() >= 2) {
+            System.out.println("chunk: (" + chunk.x + ", " + chunk.z + ")");
+            System.out.println("first point in chunk: " + roadPoints.get(0));
+            System.out.println("last point in chunk: " + roadPoints.get(roadPoints.size() - 1));
+            roads = constuctor.onChunkLoad(chunk, roadPoints, terrain);
+        } else {
+            roads = null;
+        }
+        return roads;
+    }
+
+    public List<Geometry> onRoadBuilt(ChunkCoord chunk) {
+        return constuctor.onRoadBuilt(chunk);
+    }
+
+    public Vector2f getChunkCenter(ChunkCoord chunk, float chunkSize) {
+        float centerX = chunk.x * chunkSize + chunkSize / 2f;
+        float centerZ = chunk.z * chunkSize + chunkSize / 2f;
+        return new Vector2f(centerX, centerZ);
     }
 }

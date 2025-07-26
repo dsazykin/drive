@@ -26,7 +26,7 @@ public class ChunkManager {
     private final int renderDistance;
     private final Set<String> loadingChunks = new HashSet<>();
 
-    private final Map<String, Geometry> loadedChunks = new HashMap<>();
+    private final Map<ChunkCoord, Geometry> loadedChunks = new HashMap<>();
 
     public ChunkManager(Node rootNode, BulletAppState bulletAppState,
                         TerrainGenerator generator, RoadGenerator road, SimpleApplication main, ExecutorService executor,
@@ -47,9 +47,8 @@ public class ChunkManager {
         return chunkX + "_" + chunkZ;
     }
 
-    public void addChunk(int chunkX, int chunkZ, Geometry chunk) {
-        String key = chunkKey(chunkX, chunkZ);
-        loadedChunks.put(key, chunk);
+    public void addChunk(ChunkCoord thisChunk, Geometry chunk) {
+        loadedChunks.put(thisChunk, chunk);
     }
 
     public void updateChunks(Vector3f playerPos) {
@@ -62,6 +61,7 @@ public class ChunkManager {
             for (int dx = -renderDistance; dx <= renderDistance; dx++) {
                 int chunkX = playerChunkX + dx;
                 int chunkZ = playerChunkZ + dz;
+                final ChunkCoord chunk = new ChunkCoord(chunkX, chunkZ);
 
                 String key = chunkKey(chunkX, chunkZ);
                 neededChunks.add(key);
@@ -70,9 +70,11 @@ public class ChunkManager {
                     loadingChunks.add(key);
                     executor.submit(() -> {
                         try {
-                            float[][] terrain = generator.generateHeightMap(chunkSize, scale, chunkX, chunkZ);
+                            float[][] terrain = generator.generateHeightMap(chunkSize, scale, chunk);
                             Mesh mesh = generator.generateChunkMesh(terrain, chunkSize, scale);
-                            Geometry chunk = generator.createGeometry(chunkX, chunkZ, mesh);
+                            Geometry chunkGeom = generator.createGeometry(chunk, mesh);
+
+                            List<Geometry> roads = road.buildRoad(chunk, terrain);
 
 //                            Geometry r;
 //                            if (chunkX == 0) {
@@ -84,11 +86,19 @@ public class ChunkManager {
 //                            }
 
                             main.enqueue(() -> {
-                                loadedChunks.put(key, chunk);
+                                loadedChunks.put(chunk, chunkGeom);
                                 loadingChunks.remove(key);
 
-                                rootNode.attachChild(chunk);
-                                bulletAppState.getPhysicsSpace().add(chunk.getControl(RigidBodyControl.class));
+                                rootNode.attachChild(chunkGeom);
+                                bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
+
+                                if (roads != null) {
+                                    for (Geometry r : roads) {
+                                        rootNode.attachChild(r);
+                                        bulletAppState.getPhysicsSpace()
+                                                .add(r.getControl(RigidBodyControl.class));
+                                    }
+                                }
 
 //                                if (chunkX == 0) {
 //                                    rootNode.attachChild(r);
@@ -96,36 +106,6 @@ public class ChunkManager {
 //                                            .add(r.getControl(RigidBodyControl.class));
 //                                    System.out.println("Attaching road at Z = " + (chunkZ * chunkSize * (scale / 4f)));
 //                                }
-
-                                Geometry r;
-                                if (chunkX == 0 && chunkZ == 0) {
-                                    road.generateInitialPath();
-                                }
-
-                                // Only extend path if necessary
-                                Vector2f chunkCenter = generator.getChunkCenter(chunkX, chunkZ, chunkSize * (scale / 4));
-                                while (road.furthestPoint().distance(chunkCenter) < 500 * 1.5f) {
-                                    road.extendPath();
-                                }
-
-                                // Now fetch road points
-                                List<Vector2f>
-                                        roadPoints = road.getPointsInChunk(chunkX, chunkZ, (int) (chunkSize * (scale / 4)));
-
-                                if (roadPoints.size() >= 2) {
-                                    System.out.println("chunk: (" + chunkX + ", " + chunkZ + ")");
-                                    System.out.println("first point in chunk: " + roadPoints.get(0));
-                                    System.out.println("last point in chunk: " + roadPoints.get(roadPoints.size() - 1));
-                                    r = road.buildRoad(roadPoints, 10f, terrain, chunkX, chunkZ, chunkSize, scale);
-                                } else {
-                                    r = null;
-                                }
-
-                                if (r != null) {
-                                    rootNode.attachChild(r);
-                                    bulletAppState.getPhysicsSpace()
-                                            .add(r.getControl(RigidBodyControl.class));
-                                }
                             });
                         } catch (Exception e) {
                             e.printStackTrace();
