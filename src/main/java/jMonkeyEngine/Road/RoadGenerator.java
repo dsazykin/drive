@@ -66,7 +66,7 @@ public class RoadGenerator extends SimpleApplication {
         stateManager.attach(bulletAppState);
         bulletAppState.setDebugEnabled(true);
 
-        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, this, this, executor, 50, 40, 3, 1234L);
+        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, this, this, executor, 50, 40, 3, 987654567L);
         this.manager =
                 new ChunkManager(rootNode, bulletAppState, generator, this, this, executor, 50,
                                  40, 3);
@@ -83,10 +83,10 @@ public class RoadGenerator extends SimpleApplication {
         cam.lookAt(Vector3f.ZERO, Vector3f.UNIT_Y);
     }
 
-//    @Override
-//    public void simpleUpdate(float tpf) {
-//        manager.updateChunks(cam.getLocation());
-//    }
+    @Override
+    public void simpleUpdate(float tpf) {
+        manager.updateChunks(cam.getLocation());
+    }
 
     private void setUpLight() {
         // We add light so we see the scene
@@ -194,11 +194,17 @@ public class RoadGenerator extends SimpleApplication {
         float endZ = startZ + chunkSize;
 
         List<Vector2f> segment = new ArrayList<>();
-        for (Vector2f p : pathPoints) {
+
+        List<Vector2f> snapshot;
+        synchronized (pathPoints) {
+            snapshot = new ArrayList<>(pathPoints);
+        }
+        for (Vector2f p : snapshot) {
             if (p.x >= startX && p.x < endX && p.y >= startZ && p.y < endZ) {
                 segment.add(p);
             }
         }
+
         return segment;
     }
 

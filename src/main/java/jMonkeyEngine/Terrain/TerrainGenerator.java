@@ -157,6 +157,8 @@ public class TerrainGenerator{
                         Mesh mesh = generateChunkMesh(terrain, chunkSize, scale);
                         Geometry chunkGeom = createGeometry(chunk, mesh);
 
+                        List<Geometry> roads = generator.buildRoad(chunk, terrain);
+
                         int zOffSet = (int) (chunk.z * ((chunkSize - 1) * (scale / 4)));
                         int xOffSet = (int) (chunk.x * ((chunkSize - 1) * (scale / 4)));
 //                        if (finalChunkX == 0) {
@@ -170,8 +172,6 @@ public class TerrainGenerator{
                             manager.addChunk(chunk, chunkGeom);
                             rootNode.attachChild(chunkGeom);
                             bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
-
-                            List<Geometry> roads = generator.buildRoad(chunk, terrain);
 
                             if (roads != null) {
                                 for (Geometry r : roads) {

@@ -24,7 +24,7 @@ public class ChunkManager {
     private final int chunkSize;
     private final float scale;
     private final int renderDistance;
-    private final Set<String> loadingChunks = new HashSet<>();
+    private final Set<ChunkCoord> loadingChunks = new HashSet<>();
 
     private final Map<ChunkCoord, Geometry> loadedChunks = new HashMap<>();
 
@@ -55,7 +55,7 @@ public class ChunkManager {
         int playerChunkX = (int) Math.floor(playerPos.x / ((chunkSize - 1) * (scale / 4)));
         int playerChunkZ = (int) Math.floor(playerPos.z / ((chunkSize - 1) * (scale / 4)));
 
-        Set<String> neededChunks = new HashSet<>();
+        Set<ChunkCoord> neededChunks = new HashSet<>();
 
         for (int dz = -renderDistance; dz <= renderDistance; dz++) {
             for (int dx = -renderDistance; dx <= renderDistance; dx++) {
@@ -63,18 +63,15 @@ public class ChunkManager {
                 int chunkZ = playerChunkZ + dz;
                 final ChunkCoord chunk = new ChunkCoord(chunkX, chunkZ);
 
-                String key = chunkKey(chunkX, chunkZ);
-                neededChunks.add(key);
+                neededChunks.add(chunk);
 
-                if (!loadedChunks.containsKey(key) && !loadingChunks.contains(key)) {
-                    loadingChunks.add(key);
+                if (!loadedChunks.containsKey(chunk) && !loadingChunks.contains(chunk)) {
+                    loadingChunks.add(chunk);
                     executor.submit(() -> {
                         try {
                             float[][] terrain = generator.generateHeightMap(chunkSize, scale, chunk);
                             Mesh mesh = generator.generateChunkMesh(terrain, chunkSize, scale);
                             Geometry chunkGeom = generator.createGeometry(chunk, mesh);
-
-                            List<Geometry> roads = road.buildRoad(chunk, terrain);
 
 //                            Geometry r;
 //                            if (chunkX == 0) {
@@ -87,10 +84,12 @@ public class ChunkManager {
 
                             main.enqueue(() -> {
                                 loadedChunks.put(chunk, chunkGeom);
-                                loadingChunks.remove(key);
+                                loadingChunks.remove(chunk);
 
                                 rootNode.attachChild(chunkGeom);
                                 bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
+
+                                List<Geometry> roads = road.buildRoad(chunk, terrain);
 
                                 if (roads != null) {
                                     for (Geometry r : roads) {

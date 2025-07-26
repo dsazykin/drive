@@ -165,19 +165,22 @@ public class RoadConstuctor {
     }
 
     protected List<Geometry> onRoadBuilt(ChunkCoord thisChunk) {
-        // Check for waiting chunks
         Iterator<DeferredConnection> it = deferredJoins.iterator();
+        List<DeferredConnection> toRemove = new ArrayList<>();
         List<Geometry> roads = new ArrayList<>();
+
         while (it.hasNext()) {
             DeferredConnection dc = it.next();
             if (dc.prevChunk.equals(thisChunk)) {
                 RoadEndpoint prev = exitPointMap.get(thisChunk);
                 Geometry road = buildRoad(dc.path, dc.terrain, dc.thisChunk, prev.left, prev.right);
                 roads.add(road);
-                roads.addAll(onRoadBuilt(dc.thisChunk));
-                it.remove();
+                roads.addAll(onRoadBuilt(dc.thisChunk)); // recurse safely
+                toRemove.add(dc); // defer removal
             }
         }
+
+        deferredJoins.removeAll(toRemove); // modify list outside iteration
         return roads;
     }
 
