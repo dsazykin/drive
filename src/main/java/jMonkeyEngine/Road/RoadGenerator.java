@@ -4,6 +4,7 @@ import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.collision.shapes.MeshCollisionShape;
 import com.jme3.bullet.control.RigidBodyControl;
+import com.jme3.font.BitmapText;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
@@ -30,6 +31,9 @@ public class RoadGenerator extends SimpleApplication {
     ChunkManager manager;
     RoadConstuctor constuctor;
 
+    private BitmapText chunkX;
+    private BitmapText chunkZ;
+
     private List<Vector2f> pathPoints = Collections.synchronizedList(new ArrayList<>());
     private final float segmentLength = 10f;
     private float currentAngle = 0f;
@@ -37,10 +41,10 @@ public class RoadGenerator extends SimpleApplication {
     private Vector2f currentPosition = new Vector2f(0, 0);
 
     private Random rand = new Random();
-    private final float maxTurnAngle = 10f;
+    private final float maxTurnAngle = 15f;
 
     private final int CHUNK_SIZE = 50;
-    private final float SCALE = 40f;
+    private final float SCALE = 20f;
 
     private final float ROAD_WIDTH = 10f;
 
@@ -64,12 +68,12 @@ public class RoadGenerator extends SimpleApplication {
         stateManager.attach(bulletAppState);
         bulletAppState.setDebugEnabled(true);
 
-        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, this, this, executor, 50, 40, 3, 987654567L);
+        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, this, this, executor, CHUNK_SIZE, SCALE, 3, 987654567L);
         this.manager =
-                new ChunkManager(rootNode, bulletAppState, generator, this, this, executor, 50,
-                                 40, 3);
+                new ChunkManager(rootNode, bulletAppState, generator, this, this, executor, CHUNK_SIZE,
+                                 SCALE, 3);
         generator.setChunkManager(manager);
-        this.constuctor = new RoadConstuctor(CHUNK_SIZE, SCALE, ROAD_WIDTH, rootNode, bulletAppState, assetManager);
+        this.constuctor = new RoadConstuctor(CHUNK_SIZE, SCALE, ROAD_WIDTH, this, assetManager);
 
         setUpLight();
         generator.CreateTerrain();
@@ -79,11 +83,25 @@ public class RoadGenerator extends SimpleApplication {
 
         cam.setLocation(new Vector3f(32, 500, 32));
         cam.lookAt(Vector3f.ZERO, Vector3f.UNIT_Y);
+
+        guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
+        chunkX = new BitmapText(guiFont, false);
+        chunkX.setSize(guiFont.getCharSet().getRenderedSize());
+        chunkX.setLocalTranslation(10, cam.getHeight() - 10, 0);
+        guiNode.attachChild(chunkX);
+
+        chunkZ = new BitmapText(guiFont, false);
+        chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
+        chunkZ.setLocalTranslation(10, cam.getHeight() - 50, 0);
+        guiNode.attachChild(chunkZ);
     }
 
     @Override
     public void simpleUpdate(float tpf) {
         manager.updateChunks(cam.getLocation());
+
+        chunkX.setText(String.format("X Coord: %.1f", Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 4)))));
+        chunkZ.setText(String.format("Z Coord: %.1f", Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 4)))));
     }
 
     private void setUpLight() {
@@ -112,7 +130,7 @@ public class RoadGenerator extends SimpleApplication {
             vertices[i * 2] = new Vector3f(-width / 2f, height + 0.05f, zLocal + zOffSet); // Left
             vertices[i * 2 + 1] = new Vector3f(width / 2f, height + 0.05f, zLocal + zOffSet); // Right
 
-            // Optional: dark gray color for road
+            // dark gray color for road
             colors[i * 2] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
             colors[i * 2 + 1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
         }
@@ -178,7 +196,7 @@ public class RoadGenerator extends SimpleApplication {
             float dz = FastMath.sin(currentAngle) * segmentLength;
 
             next = last.add(new Vector2f(dx, dz));
-            if (next.getY() > last.getY()) {
+            if ((next.getY() > last.getY()) && (next.getX() > last.getX())) {
                 rightDirection = true;
             }
         }
@@ -228,8 +246,8 @@ public class RoadGenerator extends SimpleApplication {
 
         if (roadPoints.size() >= 2) {
             System.out.println("chunk: (" + chunk.x + ", " + chunk.z + ")");
-            System.out.println("first point in chunk: " + roadPoints.get(0));
-            System.out.println("last point in chunk: " + roadPoints.get(roadPoints.size() - 1));
+//            System.out.println("first point in chunk: " + roadPoints.get(0));
+//            System.out.println("last point in chunk: " + roadPoints.get(roadPoints.size() - 1));
             roads = constuctor.onChunkLoad(chunk, roadPoints, terrain);
         } else {
             roads = null;
@@ -237,13 +255,13 @@ public class RoadGenerator extends SimpleApplication {
         return roads;
     }
 
-    public List<Geometry> onRoadBuilt(ChunkCoord chunk) {
-        return constuctor.onRoadBuilt(chunk);
-    }
-
     public Vector2f getChunkCenter(ChunkCoord chunk, float chunkSize) {
         float centerX = chunk.x * chunkSize + chunkSize / 2f;
         float centerZ = chunk.z * chunkSize + chunkSize / 2f;
         return new Vector2f(centerX, centerZ);
+    }
+
+    public Vector2f getPrevPoint(Vector2f point) {
+        return pathPoints.get(pathPoints.indexOf(point) - 2);
     }
 }

@@ -52,8 +52,8 @@ public class ChunkManager {
     }
 
     public void updateChunks(Vector3f playerPos) {
-        int playerChunkX = (int) Math.floor(playerPos.x / ((chunkSize - 1) * (scale / 4)));
-        int playerChunkZ = (int) Math.floor(playerPos.z / ((chunkSize - 1) * (scale / 4)));
+        int playerChunkX = (int) Math.floor(playerPos.x / ((chunkSize) * (scale / 4)));
+        int playerChunkZ = (int) Math.floor(playerPos.z / ((chunkSize) * (scale / 4)));
 
         Set<ChunkCoord> neededChunks = new HashSet<>();
 
@@ -73,6 +73,8 @@ public class ChunkManager {
                             Mesh mesh = generator.generateChunkMesh(terrain, chunkSize, scale);
                             Geometry chunkGeom = generator.createGeometry(chunk, mesh);
 
+                            List<Geometry> roads = road.buildRoad(chunk, terrain);
+
 //                            Geometry r;
 //                            if (chunkX == 0) {
 //                                int zOffSet = (int) (chunkZ * ((chunkSize - 1) * (scale / 4)));
@@ -88,8 +90,6 @@ public class ChunkManager {
 
                                 rootNode.attachChild(chunkGeom);
                                 bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
-
-                                List<Geometry> roads = road.buildRoad(chunk, terrain);
 
                                 if (roads != null) {
                                     for (Geometry r : roads) {

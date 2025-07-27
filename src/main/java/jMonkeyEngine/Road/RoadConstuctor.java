@@ -6,6 +6,7 @@ import com.jme3.bullet.collision.shapes.MeshCollisionShape;
 import com.jme3.bullet.control.RigidBodyControl;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
+import com.jme3.math.FastMath;
 import com.jme3.math.Vector2f;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
@@ -24,20 +25,18 @@ public class RoadConstuctor {
 
     private final float ROAD_WIDTH;
 
-    private final Node rootNode;
-    private final BulletAppState bulletAppState;
+    private final RoadGenerator generator;
     private final AssetManager assetManager;
 
     private ConcurrentHashMap<ChunkCoord, RoadEndpoint> exitPointMap = new ConcurrentHashMap<>();
     private List<DeferredConnection> deferredJoins = Collections.synchronizedList(new ArrayList<>());
 
-    public RoadConstuctor(int chunkSize, float scale, float roadWidth, Node rootNode,
-                          BulletAppState bulletAppState, AssetManager assetManager) {
+    public RoadConstuctor(int chunkSize, float scale, float roadWidth, RoadGenerator generator,
+                          AssetManager assetManager) {
         CHUNK_SIZE = chunkSize;
         SCALE = scale;
         ROAD_WIDTH = roadWidth;
-        this.rootNode = rootNode;
-        this.bulletAppState = bulletAppState;
+        this.generator = generator;
         this.assetManager = assetManager;
     }
 
@@ -45,7 +44,8 @@ public class RoadConstuctor {
                          Vector3f chunkEntryLeft, Vector3f chunkEntryRight) {
 
         boolean notFirst = (chunkEntryLeft != null || chunkEntryRight != null);
-        System.out.println(notFirst);
+        //System.out.println(notFirst);
+        System.out.println("built road for chunk: " + chunk);
 
         int extraVerts = notFirst ? 2 : 0;
         int vertexCount = path.size() * 2 + extraVerts;
@@ -78,9 +78,14 @@ public class RoadConstuctor {
                     sampleHeight(center, terrain, chunk.x, chunk.z);
             float heightOffset = 0.05f;
 
-            Vector3f leftVector = new Vector3f(leftPt.x, centerHeight + heightOffset, leftPt.y);
+            float leftHeight = sampleHeight(leftPt, terrain, chunk.x, chunk.z);
+            float rightHeight = sampleHeight(rightPt, terrain, chunk.x, chunk.z);
+
+            float height = Math.max(leftHeight, rightHeight);
+
+            Vector3f leftVector = new Vector3f(leftPt.x, height + heightOffset, leftPt.y);
             Vector3f rightVector =
-                    new Vector3f(rightPt.x, centerHeight + heightOffset, rightPt.y);
+                    new Vector3f(rightPt.x, height + heightOffset, rightPt.y);
 
             int vi = i * 2 + extraVerts;
             vertices[vi] = leftVector;
@@ -130,37 +135,41 @@ public class RoadConstuctor {
     }
 
     protected List<Geometry> onChunkLoad(ChunkCoord thisChunk, List<Vector2f> path, float[][] terrain) {
-        ChunkCoord prevChunk = getPrevChunk(path.get(0), path.get(1));
-        System.out.println("suspected previous chunk: " + prevChunk);
-
         List<Geometry> roads = new ArrayList<>();
 
-        if (exitPointMap.containsKey(prevChunk) || (thisChunk.x == 0 && thisChunk.z == 0) ) {
-            // Build road with continuation
-            Geometry road;
-            if (!(thisChunk.x == 0 && thisChunk.z == 0)) {
+        // Check if this is the origin chunk
+        if (!(thisChunk.x == 0 && thisChunk.z == 0)) {
+
+            // If it isn't find out where the road came from and extend
+            ChunkCoord prevChunk = getPrevChunk(path.get(0));
+            System.out.println("suspected previous chunk: " + prevChunk + "for: " + thisChunk);
+
+            if (exitPointMap.containsKey(prevChunk)) {
+                // Build road with continuation
                 RoadEndpoint prev = exitPointMap.get(prevChunk);
-                road = buildRoad(path, terrain, thisChunk, prev.left, prev.right);
+                Geometry road = buildRoad(path, terrain, thisChunk, prev.left, prev.right);
+                roads.add(road);
+                //System.out.println("built chunk: (" + thisChunk.x + ", " + thisChunk.z + ")");
+
+                //System.out.println("built dependent roads for chunk: (" + thisChunk.x + ", " +
+                // thisChunk.z + ")");
             } else {
-                road = buildRoad(path, terrain, thisChunk, null, null);
+                // Defer connection until prevChunk is available
+                DeferredConnection deferred = new DeferredConnection(thisChunk, prevChunk, path, terrain);
+                deferredJoins.add(deferred);
+                return null;
             }
+
+            // If it is just build the road
+        }  else {
+            Geometry road = buildRoad(path, terrain, thisChunk, null, null);
             roads.add(road);
-            System.out.println("built chunk: (" + thisChunk.x + ", " + thisChunk.z + ")");
-
-            List<Geometry> dependentRoads = onRoadBuilt(thisChunk);
-            System.out.println("built dependent roads for chunk: (" + thisChunk.x + ", " + thisChunk.z + ")");
-
-            roads.addAll(dependentRoads);
-            return roads;
-//            rootNode.attachChild(road);
-//            bulletAppState.getPhysicsSpace()
-//                    .add(road.getControl(RigidBodyControl.class));
-        } else {
-            // Defer connection until prevChunk is available
-            DeferredConnection deferred = new DeferredConnection(thisChunk, prevChunk, path, terrain);
-            deferredJoins.add(deferred);
-            return null;
         }
+
+        List<Geometry> dependentRoads = onRoadBuilt(thisChunk);
+        roads.addAll(dependentRoads);
+
+        return roads;
     }
 
     protected List<Geometry> onRoadBuilt(ChunkCoord thisChunk) {
@@ -189,30 +198,52 @@ public class RoadConstuctor {
     }
 
     private float sampleHeight(Vector2f pos, float[][] terrain, int chunkX, int chunkZ) {
-        float chunkOriginX = chunkX * CHUNK_SIZE * (SCALE / 4);
-        float chunkOriginZ = chunkZ * CHUNK_SIZE * (SCALE / 4);
+        float chunkOriginX = chunkX * CHUNK_SIZE * (SCALE / 4f);
+        float chunkOriginZ = chunkZ * CHUNK_SIZE * (SCALE / 4f);
 
-        // Convert world coordinates to local heightmap indices
-        int localX = Math.round((pos.x - chunkOriginX) / (SCALE / 4));
-        int localZ = Math.round((pos.y - chunkOriginZ) / (SCALE / 4));
+        // Convert world position to heightmap space
+        float fx = (pos.x - chunkOriginX) / (SCALE / 4f);
+        float fz = (pos.y - chunkOriginZ) / (SCALE / 4f);
 
-        // Clamp to terrain bounds
-        localX = Math.max(0, Math.min(terrain.length - 1, localX));
-        localZ = Math.max(0, Math.min(terrain[0].length - 1, localZ));
+        int x = (int) Math.floor(fx);
+        int z = (int) Math.floor(fz);
 
-        float rawHeight = terrain[localX][localZ];
+        float dx = fx - x;
+        float dz = fz - z;
 
-        return rawHeight * 50f;
+        // Clamp to safe bounds (make sure x+1 and z+1 are valid)
+        x = Math.max(0, Math.min(terrain.length - 2, x));
+        z = Math.max(0, Math.min(terrain[0].length - 2, z));
+
+        // Get 4 surrounding heights
+        float h00 = terrain[x][z];
+        float h10 = terrain[x + 1][z];
+        float h01 = terrain[x][z + 1];
+        float h11 = terrain[x + 1][z + 1];
+
+        // Bilinear interpolation
+        float h0 = h00 * (1 - dx) + h10 * dx;
+        float h1 = h01 * (1 - dx) + h11 * dx;
+        float interpolatedHeight = h0 * (1 - dz) + h1 * dz;
+
+        return interpolatedHeight * 50f; // Scale to world height
     }
 
-    private ChunkCoord getPrevChunk(Vector2f first, Vector2f second) {
-        Vector2f direction = first.subtract(second).normalize();
+    private ChunkCoord getPrevChunk(Vector2f first) {
+//        Vector2f direction = first.subtract(second).normalize();
+//
+//        float approxStepSize = first.distance(second);
+//        Vector2f previousPos = first.add(direction.mult(approxStepSize));
+//
+//        int prevChunkX = (int) Math.floor(previousPos.x / (CHUNK_SIZE * (SCALE / 4)));
+//        int prevChunkZ = (int) Math.floor(previousPos.y / (CHUNK_SIZE * (SCALE / 4)));
+//
+//        return new ChunkCoord(prevChunkX, prevChunkZ);
 
-        float approxStepSize = first.distance(second);
-        Vector2f previousPos = first.add(direction.mult(approxStepSize));
+        Vector2f prevPoint = generator.getPrevPoint(first);
 
-        int prevChunkX = (int) Math.floor(previousPos.x / (CHUNK_SIZE * (SCALE / 4)));
-        int prevChunkZ = (int) Math.floor(previousPos.y / (CHUNK_SIZE * (SCALE / 4)));
+        int prevChunkX = (int) Math.floor(prevPoint.x / (CHUNK_SIZE * (SCALE / 4)));
+        int prevChunkZ = (int) Math.floor(prevPoint.y / (CHUNK_SIZE * (SCALE / 4)));
 
         return new ChunkCoord(prevChunkX, prevChunkZ);
     }
