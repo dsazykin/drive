@@ -44,8 +44,7 @@ public class RoadConstuctor {
                          Vector3f chunkEntryLeft, Vector3f chunkEntryRight) {
 
         boolean notFirst = (chunkEntryLeft != null || chunkEntryRight != null);
-        //System.out.println(notFirst);
-        System.out.println("built road for chunk: " + chunk);
+        //System.out.println("built road for chunk: " + chunk);
 
         int extraVerts = notFirst ? 2 : 0;
         int vertexCount = path.size() * 2 + extraVerts;
@@ -76,12 +75,16 @@ public class RoadConstuctor {
 
             float centerHeight =
                     sampleHeight(center, terrain, chunk.x, chunk.z);
-            float heightOffset = 0.05f;
+            float heightOffset = 0.1f;
 
             float leftHeight = sampleHeight(leftPt, terrain, chunk.x, chunk.z);
             float rightHeight = sampleHeight(rightPt, terrain, chunk.x, chunk.z);
 
             float height = Math.max(leftHeight, rightHeight);
+
+//            System.out.printf("Chunk %s - Road center: %.2f, %.2f | chunkOrigin: %.2f, %.2f%n",
+//                              chunk, center.x, center.y, chunk.x * CHUNK_SIZE * (SCALE / 4),
+//                              chunk.z * CHUNK_SIZE * (SCALE / 4));
 
             Vector3f leftVector = new Vector3f(leftPt.x, height + heightOffset, leftPt.y);
             Vector3f rightVector =
@@ -142,7 +145,7 @@ public class RoadConstuctor {
 
             // If it isn't find out where the road came from and extend
             ChunkCoord prevChunk = getPrevChunk(path.get(0));
-            System.out.println("suspected previous chunk: " + prevChunk + "for: " + thisChunk);
+            //System.out.println("suspected previous chunk: " + prevChunk + "for: " + thisChunk);
 
             if (exitPointMap.containsKey(prevChunk)) {
                 // Build road with continuation
@@ -205,8 +208,8 @@ public class RoadConstuctor {
         float fx = (pos.x - chunkOriginX) / (SCALE / 4f);
         float fz = (pos.y - chunkOriginZ) / (SCALE / 4f);
 
-        int x = (int) Math.floor(fx);
-        int z = (int) Math.floor(fz);
+        int x = Math.round(fx);
+        int z = Math.round(fz);
 
         float dx = fx - x;
         float dz = fz - z;
@@ -230,16 +233,6 @@ public class RoadConstuctor {
     }
 
     private ChunkCoord getPrevChunk(Vector2f first) {
-//        Vector2f direction = first.subtract(second).normalize();
-//
-//        float approxStepSize = first.distance(second);
-//        Vector2f previousPos = first.add(direction.mult(approxStepSize));
-//
-//        int prevChunkX = (int) Math.floor(previousPos.x / (CHUNK_SIZE * (SCALE / 4)));
-//        int prevChunkZ = (int) Math.floor(previousPos.y / (CHUNK_SIZE * (SCALE / 4)));
-//
-//        return new ChunkCoord(prevChunkX, prevChunkZ);
-
         Vector2f prevPoint = generator.getPrevPoint(first);
 
         int prevChunkX = (int) Math.floor(prevPoint.x / (CHUNK_SIZE * (SCALE / 4)));

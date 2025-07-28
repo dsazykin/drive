@@ -132,9 +132,9 @@ public class TerrainGenerator{
         chunkGeom.setMaterial(mat);
 
         chunkGeom.setLocalTranslation(
-                chunk.x * (chunkSize - 0.9f) * (scale / 4),
+                chunk.x * (chunkSize - 1f) * (scale / 4),
                 0,
-                chunk.z * (chunkSize - 0.9f) * (scale / 4)
+                chunk.z * (chunkSize - 1f) * (scale / 4)
         );
 
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);

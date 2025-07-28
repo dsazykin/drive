@@ -70,10 +70,11 @@ public class ChunkManager {
                     executor.submit(() -> {
                         try {
                             float[][] terrain = generator.generateHeightMap(chunkSize, scale, chunk);
-                            Mesh mesh = generator.generateChunkMesh(terrain, chunkSize, scale);
-                            Geometry chunkGeom = generator.createGeometry(chunk, mesh);
 
                             List<Geometry> roads = road.buildRoad(chunk, terrain);
+
+                            Mesh mesh = generator.generateChunkMesh(terrain, chunkSize, scale);
+                            Geometry chunkGeom = generator.createGeometry(chunk, mesh);
 
 //                            Geometry r;
 //                            if (chunkX == 0) {

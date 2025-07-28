@@ -43,7 +43,7 @@ public class RoadGenerator extends SimpleApplication {
     private Random rand = new Random();
     private final float maxTurnAngle = 15f;
 
-    private final int CHUNK_SIZE = 50;
+    private final int CHUNK_SIZE = 100;
     private final float SCALE = 20f;
 
     private final float ROAD_WIDTH = 10f;
@@ -68,10 +68,10 @@ public class RoadGenerator extends SimpleApplication {
         stateManager.attach(bulletAppState);
         bulletAppState.setDebugEnabled(true);
 
-        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, this, this, executor, CHUNK_SIZE, SCALE, 3, 987654567L);
+        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, this, this, executor, CHUNK_SIZE, SCALE, 1, 987654567L);
         this.manager =
                 new ChunkManager(rootNode, bulletAppState, generator, this, this, executor, CHUNK_SIZE,
-                                 SCALE, 3);
+                                 SCALE, 1);
         generator.setChunkManager(manager);
         this.constuctor = new RoadConstuctor(CHUNK_SIZE, SCALE, ROAD_WIDTH, this, assetManager);
 
@@ -245,7 +245,7 @@ public class RoadGenerator extends SimpleApplication {
         List<Vector2f> roadPoints = getPointsInChunk(chunk, (int) (CHUNK_SIZE * (SCALE / 4)));
 
         if (roadPoints.size() >= 2) {
-            System.out.println("chunk: (" + chunk.x + ", " + chunk.z + ")");
+            //System.out.println("chunk: (" + chunk.x + ", " + chunk.z + ")");
 //            System.out.println("first point in chunk: " + roadPoints.get(0));
 //            System.out.println("last point in chunk: " + roadPoints.get(roadPoints.size() - 1));
             roads = constuctor.onChunkLoad(chunk, roadPoints, terrain);
