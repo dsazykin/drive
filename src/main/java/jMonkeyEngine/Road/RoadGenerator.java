@@ -196,7 +196,26 @@ public class RoadGenerator extends SimpleApplication {
             float dz = FastMath.sin(currentAngle) * segmentLength;
 
             next = last.add(new Vector2f(dx, dz));
-            if ((next.getY() > last.getY()) && (next.getX() > last.getX())) {
+
+            boolean rightAngle = false;
+
+            if (pathPoints.size() >= 2) {
+                Vector2f secondLast = pathPoints.get(pathPoints.size() - 2);
+                Vector2f lastDir = last.subtract(secondLast).normalize();
+                Vector2f newDir = next.subtract(last).normalize();
+
+                float dot = lastDir.dot(newDir);
+                float angleBetween = FastMath.acos(dot); // in radians
+                float maxTurnRadians = FastMath.DEG_TO_RAD * maxTurnAngle;
+
+                if (angleBetween < maxTurnRadians) {
+                    rightAngle = true;
+                }
+            } else {
+                rightAngle = true;
+            }
+
+            if ((next.getY() > last.getY()) && (rightAngle)) {
                 rightDirection = true;
             }
         }
