@@ -14,9 +14,6 @@ public class HeightMapGenerator {
 
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 
-        float max = -1;
-        float min = 2;
-
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 // Convert local (x, y) in the chunk to world coordinates
@@ -31,14 +28,6 @@ public class HeightMapGenerator {
 
                 // Shift to [0, 1]
                 e = (e + 1f) / 2f;
-
-                if (e > max) {
-                    max = e;
-                }
-
-                if (e < min) {
-                    min = e;
-                }
 
                 heightmap[x][y] = e;
 
@@ -80,9 +69,6 @@ public class HeightMapGenerator {
                 image.setRGB(x, y, rgb);
             }
         }
-
-        System.out.println(max);
-        System.out.println(min);
 
         String folderPath = "generated_noise";
         File directory = new File(folderPath);
