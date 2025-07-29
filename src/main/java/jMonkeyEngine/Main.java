@@ -70,12 +70,12 @@ public class Main extends SimpleApplication
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
 
-        road = new RoadGenerator(assetManager, this, CHUNK_SIZE, SCALE, ROAD_WIDTH);
+        road = new RoadGenerator(assetManager, this, CHUNK_SIZE, SCALE, 100, ROAD_WIDTH);
         generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, road, this, executor,
-                                         CHUNK_SIZE, SCALE, 1, SEED);
+                                         CHUNK_SIZE, SCALE, 5, SEED, 100);
         this.manager =
                 new ChunkManager(bulletAppState, rootNode, road, generator, this, executor, CHUNK_SIZE,
-                                 SCALE, 1);
+                                 SCALE, 5, 100);
         generator.setChunkManager(manager);
 
         setUpKeys();
@@ -150,7 +150,7 @@ public class Main extends SimpleApplication
     private void initCar() {
         car = new Car(assetManager, bulletAppState.getPhysicsSpace());
         // Set desired spawn location
-        Vector3f spawnPosition = new Vector3f(2f, 10f, -2f); // <-- change this
+        Vector3f spawnPosition = new Vector3f(2f, 50f, -2f); // <-- change this
 
         // Apply to the physics control (VehicleControl or similar)
         car.getControl().setPhysicsLocation(spawnPosition);
@@ -255,8 +255,8 @@ public class Main extends SimpleApplication
             frontRightText.setText(String.format("FR: %.1f", control.getWheel(1).getFrictionSlip()));
             rearLeftText.setText(String.format("RL: %.1f", control.getWheel(2).getFrictionSlip()));
             rearRightText.setText(String.format("RR: %.1f", control.getWheel(3).getFrictionSlip()));
-            chunkX.setText(String.format("X Coord: %.1f", Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 4)))));
-            chunkZ.setText(String.format("Z Coord: %.1f", Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 4)))));
+            chunkX.setText(String.format("X Coord: %.1f", Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 8)))));
+            chunkZ.setText(String.format("Z Coord: %.1f", Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 8)))));
         }
     }
 

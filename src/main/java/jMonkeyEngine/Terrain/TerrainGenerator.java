@@ -37,13 +37,14 @@ public class TerrainGenerator{
     private final float scale;
     private final int renderDistance; // Grid size will be (2 * renderDistance - 1)^2
     private final Long seed;
+    private final int MAX_HEIGHT;
 
     private List<Future<?>> chunkTasks;
 
     public TerrainGenerator(BulletAppState bulletAppState,
                             Node rootNode, AssetManager assetManager, RoadGenerator generator, SimpleApplication main,
                             ExecutorService executor, int chunkSize, float scale,
-                            int renderDistance, Long seed) {
+                            int renderDistance, Long seed, int maxHeight) {
         this.bulletAppState = bulletAppState;
         this.rootNode = rootNode;
         this.assetManager = assetManager;
@@ -54,6 +55,7 @@ public class TerrainGenerator{
         this.scale = scale;
         this.renderDistance = renderDistance;
         this.seed = seed;
+        MAX_HEIGHT = maxHeight;
         this.heightMap = new HeightMapGenerator();
     }
 
@@ -77,21 +79,34 @@ public class TerrainGenerator{
                 float height = terrain[x][z];
 
                 ColorRGBA color;
-                if (height < 0.05f) {
-                    color = new ColorRGBA(0f, 0.1f, 1f, 1f); // Blue (water)
+                if (height < 0.1f) {
+                    color = new ColorRGBA(0f, 0f, 1f, 1f); // Blue (water)
+                } else if (height < 0.2f) {
+                    color = new ColorRGBA(211f / 255f, 169f / 255f, 108f / 255f, 1f); // Beach (sand yellow)
+                } else if (height < 0.3f) {
+                    color = new ColorRGBA(34f / 255f, 175f / 255f, 34f / 255f, 1f); // Light grass
+                } else if (height < 0.4f) {
+                    color = new ColorRGBA(34f / 255f, 125f / 255f, 34f / 255f, 1f); // Mid grass
+                } else if (height < 0.5f) {
+                    color = new ColorRGBA(34f / 255f, 100f / 255f, 25f / 255f, 1f); // Darker grass
+                } else if (height < 0.6f) {
+                    color = new ColorRGBA(75f / 255f, 80f / 255f, 30f / 255f, 1f); // Desaturated grass
+                } else if (height < 0.7f) {
+                    color = new ColorRGBA(90f / 255f, 75f / 255f, 20f / 255f, 1f); // Grass-dirt blend
                 } else if (height < 0.8f) {
-                    color = new ColorRGBA(0f, 1f, 0f, 1f); // Green (grass)
+                    color = new ColorRGBA(110f / 255f, 70f / 255f, 20f / 255f, 1f); // Dirtier terrain
                 } else if (height < 0.9f) {
-                    color = new ColorRGBA(0.5f, 0.35f, 0.05f, 1f); // Brown (dirt)
+                    color = new ColorRGBA(139f / 255f, 69f / 255f, 19f / 255f, 1f); // Mountain (brown)
                 } else {
-                    color = new ColorRGBA(1f, 1f, 1f, 1f); // White (snow)
+                    color = new ColorRGBA(1f, 1f, 1f, 1f); // Snow (white)
                 }
+
                 colors[vertexIndex] = color;
 
                 vertices[vertexIndex++] = new Vector3f(
-                        (float) (x * (scale / 4)),
-                        height * 50,
-                        (float) (z * (scale / 4))
+                        (float) (x * (scale / 8)),
+                        height * MAX_HEIGHT,
+                        (float) (z * (scale / 8))
                 );
 
             }
@@ -132,9 +147,9 @@ public class TerrainGenerator{
         chunkGeom.setMaterial(mat);
 
         chunkGeom.setLocalTranslation(
-                chunk.x * (chunkSize - 1f) * (scale / 4),
+                chunk.x * (chunkSize - 1f) * (scale / 8),
                 0,
-                chunk.z * (chunkSize - 1f) * (scale / 4)
+                chunk.z * (chunkSize - 1f) * (scale / 8)
         );
 
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
@@ -155,8 +170,8 @@ public class TerrainGenerator{
                 Mesh mesh = generateChunkMesh(terrain, chunkSize, scale);
                 Geometry chunkGeom = createGeometry(chunk, mesh);
 
-                int zOffSet = (int) (chunk.z * ((chunkSize - 1) * (scale / 4)));
-                int xOffSet = (int) (chunk.x * ((chunkSize - 1) * (scale / 4)));
+                int zOffSet = (int) (chunk.z * ((chunkSize - 1) * (scale / 8)));
+                int xOffSet = (int) (chunk.x * ((chunkSize - 1) * (scale / 8)));
 //                if (finalChunkX == 0) {
 //                    r = generator.generateStraightRoad(50, 10f, 10f, terrain, zOffSet);
 //                    System.out.println("generated generator");

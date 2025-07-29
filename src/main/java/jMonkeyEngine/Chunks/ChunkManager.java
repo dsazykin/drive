@@ -25,15 +25,16 @@ public class ChunkManager {
     private final int chunkSize;
     private final float scale;
     private final int renderDistance;
-    Set<ChunkCoord> loadingChunks = ConcurrentHashMap.newKeySet();
+    private final int MAX_HEIGHT;
 
+    Set<ChunkCoord> loadingChunks = ConcurrentHashMap.newKeySet();
     private final Map<ChunkCoord, Geometry> loadedChunks = new HashMap<>();
     private final HashMap<ChunkCoord, List<Geometry>> loadedRoads = new HashMap<>();
 
     public ChunkManager(BulletAppState bulletAppState, Node rootNode, RoadGenerator road,
                         TerrainGenerator generator, SimpleApplication main, ExecutorService executor,
                         int chunkSize,
-                        float scale, int renderDistance) {
+                        float scale, int renderDistance, int maxHeight) {
         this.rootNode = rootNode;
         this.bulletAppState = bulletAppState;
         this.generator = generator;
@@ -43,6 +44,7 @@ public class ChunkManager {
         this.chunkSize = chunkSize;
         this.scale = scale;
         this.renderDistance = renderDistance;
+        MAX_HEIGHT = maxHeight;
     }
 
     public void addChunk(ChunkCoord thisChunk, Geometry chunk) {
@@ -54,8 +56,8 @@ public class ChunkManager {
     }
 
     public void updateChunks(Vector3f playerPos) {
-        int playerChunkX = (int) Math.floor(playerPos.x / ((chunkSize - 1) * (scale / 4)));
-        int playerChunkZ = (int) Math.floor(playerPos.z / ((chunkSize - 1) * (scale / 4)));
+        int playerChunkX = (int) Math.floor(playerPos.x / ((chunkSize - 1) * (scale / 8)));
+        int playerChunkZ = (int) Math.floor(playerPos.z / ((chunkSize - 1) * (scale / 8)));
 
         Set<ChunkCoord> neededChunks = new HashSet<>();
 

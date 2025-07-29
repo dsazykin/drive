@@ -33,11 +33,13 @@ public class RoadGenerator {
 
     private final int CHUNK_SIZE;
     private final float SCALE;
+    private final int MAX_HEIGHT;
 
     private final float ROAD_WIDTH;
 
 
-    public RoadGenerator(AssetManager assetManager, SimpleApplication main, int chunkSize, float scale, float roadWidth) {
+    public RoadGenerator(AssetManager assetManager, SimpleApplication main, int chunkSize, float scale,
+                         int maxHeight, float roadWidth) {
         this.assetManager = assetManager;
         this.main = main;
 
@@ -45,9 +47,11 @@ public class RoadGenerator {
 
         CHUNK_SIZE = chunkSize;
         SCALE = scale;
+        MAX_HEIGHT = maxHeight;
         ROAD_WIDTH = roadWidth;
 
-        this.constructor = new RoadConstuctor(CHUNK_SIZE, SCALE, ROAD_WIDTH, this, assetManager);
+        this.constructor = new RoadConstuctor(CHUNK_SIZE, SCALE, MAX_HEIGHT, ROAD_WIDTH, this,
+                                              assetManager);
     }
 
     public Geometry generateStraightRoad(int length, float width, float scale, float[][] terrain, int zOffSet) {
@@ -170,15 +174,15 @@ public class RoadGenerator {
         }
 
         // Only extend path if necessary
-        Vector2f chunkCenter = getChunkCenter(chunk, CHUNK_SIZE * (SCALE / 4));
-        while (furthestPoint().distance(new Vector2f(main.getCamera().getLocation().x, main.getCamera().getLocation().z)) < (CHUNK_SIZE * (SCALE / 4)) * 3f) {
+        Vector2f chunkCenter = getChunkCenter(chunk, CHUNK_SIZE * (SCALE / 8));
+        while (furthestPoint().distance(new Vector2f(main.getCamera().getLocation().x, main.getCamera().getLocation().z)) < (CHUNK_SIZE * (SCALE / 8)) * 3f) {
             extendPath();
             //System.out.println("extended road for chunk: " + chunk);
         }
         //System.out.println("finished extending road for chunk: " + chunk);
 
         // Now fetch road points
-        List<Vector2f> roadPoints = getPointsInChunk(chunk, (int) (CHUNK_SIZE * (SCALE / 4)));
+        List<Vector2f> roadPoints = getPointsInChunk(chunk, (int) (CHUNK_SIZE * (SCALE / 8)));
         //System.out.println("got points for chunk: " + chunk);
 
         if (roadPoints.size() >= 2) {

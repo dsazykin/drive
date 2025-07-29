@@ -22,6 +22,7 @@ public class RoadConstuctor {
 
     private final int CHUNK_SIZE;
     private final float SCALE;
+    private final int MAX_HEIGHT;
 
     private final float ROAD_WIDTH;
 
@@ -31,10 +32,11 @@ public class RoadConstuctor {
     private ConcurrentHashMap<ChunkCoord, RoadEndpoint> exitPointMap = new ConcurrentHashMap<>();
     private List<DeferredConnection> deferredJoins = Collections.synchronizedList(new ArrayList<>());
 
-    public RoadConstuctor(int chunkSize, float scale, float roadWidth, RoadGenerator generator,
+    public RoadConstuctor(int chunkSize, float scale, int maxHeight, float roadWidth, RoadGenerator generator,
                           AssetManager assetManager) {
         CHUNK_SIZE = chunkSize;
         SCALE = scale;
+        MAX_HEIGHT = maxHeight;
         ROAD_WIDTH = roadWidth;
         this.generator = generator;
         this.assetManager = assetManager;
@@ -196,12 +198,12 @@ public class RoadConstuctor {
     }
 
     private float sampleHeight(Vector2f pos, float[][] terrain, int chunkX, int chunkZ) {
-        float chunkOriginX = chunkX * CHUNK_SIZE * (SCALE / 4f);
-        float chunkOriginZ = chunkZ * CHUNK_SIZE * (SCALE / 4f);
+        float chunkOriginX = chunkX * CHUNK_SIZE * (SCALE / 8f);
+        float chunkOriginZ = chunkZ * CHUNK_SIZE * (SCALE / 8f);
 
         // Convert world position to heightmap space
-        float fx = (pos.x - chunkOriginX) / (SCALE / 4f);
-        float fz = (pos.y - chunkOriginZ) / (SCALE / 4f);
+        float fx = (pos.x - chunkOriginX) / (SCALE / 8f);
+        float fz = (pos.y - chunkOriginZ) / (SCALE / 8f);
 
         int x = Math.round(fx);
         int z = Math.round(fz);
@@ -224,14 +226,14 @@ public class RoadConstuctor {
         float h1 = h01 * (1 - dx) + h11 * dx;
         float interpolatedHeight = h0 * (1 - dz) + h1 * dz;
 
-        return interpolatedHeight * 50f; // Scale to world height
+        return interpolatedHeight * MAX_HEIGHT; // Scale to world height
     }
 
     private ChunkCoord getPrevChunk(Vector2f first) {
         Vector2f prevPoint = generator.getPrevPoint(first);
 
-        int prevChunkX = (int) Math.floor(prevPoint.x / (CHUNK_SIZE * (SCALE / 4)));
-        int prevChunkZ = (int) Math.floor(prevPoint.y / (CHUNK_SIZE * (SCALE / 4)));
+        int prevChunkX = (int) Math.floor(prevPoint.x / (CHUNK_SIZE * (SCALE / 8)));
+        int prevChunkZ = (int) Math.floor(prevPoint.y / (CHUNK_SIZE * (SCALE / 8)));
 
         return new ChunkCoord(prevChunkX, prevChunkZ);
     }
