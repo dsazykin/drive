@@ -1,5 +1,7 @@
 package jMonkeyEngine.Chunks;
 
+import java.util.Objects;
+
 public class ChunkCoord {
     public final int x;
     public final int z;
@@ -19,7 +21,7 @@ public class ChunkCoord {
 
     @Override
     public int hashCode() {
-        return 31 * x + z;
+        return Objects.hash(x, z);
     }
 
     @Override

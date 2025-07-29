@@ -132,9 +132,9 @@ public class TerrainGenerator{
         chunkGeom.setMaterial(mat);
 
         chunkGeom.setLocalTranslation(
-                chunk.x * (chunkSize - 1f) * (scale / 4),
+                chunk.x * (chunkSize - 0.9f) * (scale / 4),
                 0,
-                chunk.z * (chunkSize - 1f) * (scale / 4)
+                chunk.z * (chunkSize - 0.9f) * (scale / 4)
         );
 
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
@@ -157,8 +157,6 @@ public class TerrainGenerator{
                         Mesh mesh = generateChunkMesh(terrain, chunkSize, scale);
                         Geometry chunkGeom = createGeometry(chunk, mesh);
 
-                        List<Geometry> roads = generator.buildRoad(chunk, terrain);
-
                         int zOffSet = (int) (chunk.z * ((chunkSize - 1) * (scale / 4)));
                         int xOffSet = (int) (chunk.x * ((chunkSize - 1) * (scale / 4)));
 //                        if (finalChunkX == 0) {
@@ -169,6 +167,8 @@ public class TerrainGenerator{
 //                        }
 
                         main.enqueue(() -> {
+                            List<Geometry> roads = generator.buildRoad(chunk, terrain);
+
                             manager.addChunk(chunk, chunkGeom);
                             rootNode.attachChild(chunkGeom);
                             bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
@@ -179,6 +179,7 @@ public class TerrainGenerator{
                                     bulletAppState.getPhysicsSpace()
                                             .add(r.getControl(RigidBodyControl.class));
                                 }
+                                manager.addRoad(chunk, roads);
                             }
 
 //                            if (finalChunkX == 0) {

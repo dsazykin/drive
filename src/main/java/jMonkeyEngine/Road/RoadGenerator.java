@@ -43,7 +43,7 @@ public class RoadGenerator extends SimpleApplication {
     private Random rand = new Random();
     private final float maxTurnAngle = 15f;
 
-    private final int CHUNK_SIZE = 100;
+    private final int CHUNK_SIZE = 40;
     private final float SCALE = 20f;
 
     private final float ROAD_WIDTH = 10f;
@@ -76,7 +76,7 @@ public class RoadGenerator extends SimpleApplication {
         this.constuctor = new RoadConstuctor(CHUNK_SIZE, SCALE, ROAD_WIDTH, this, assetManager);
 
         setUpLight();
-        generator.CreateTerrain();
+        //generator.CreateTerrain();
 
         flyCam.setEnabled(true);
         flyCam.setMoveSpeed(300);
@@ -173,7 +173,7 @@ public class RoadGenerator extends SimpleApplication {
     }
 
     public void generateInitialPath() {
-        while (furthestPoint().distance(new Vector2f(0, 0)) < 500 * 2.5f) {
+        while (furthestPoint().distance(new Vector2f(0, 0)) < 500 * 3f) {
             extendPath();
         }
     }
@@ -196,26 +196,7 @@ public class RoadGenerator extends SimpleApplication {
             float dz = FastMath.sin(currentAngle) * segmentLength;
 
             next = last.add(new Vector2f(dx, dz));
-
-            boolean rightAngle = false;
-
-            if (pathPoints.size() >= 2) {
-                Vector2f secondLast = pathPoints.get(pathPoints.size() - 2);
-                Vector2f lastDir = last.subtract(secondLast).normalize();
-                Vector2f newDir = next.subtract(last).normalize();
-
-                float dot = lastDir.dot(newDir);
-                float angleBetween = FastMath.acos(dot); // in radians
-                float maxTurnRadians = FastMath.DEG_TO_RAD * maxTurnAngle;
-
-                if (angleBetween < maxTurnRadians) {
-                    rightAngle = true;
-                }
-            } else {
-                rightAngle = true;
-            }
-
-            if ((next.getY() > last.getY()) && (rightAngle)) {
+            if ((next.getY() > last.getY()) && (next.getX() > last.getX())) {
                 rightDirection = true;
             }
         }
@@ -256,12 +237,15 @@ public class RoadGenerator extends SimpleApplication {
 
         // Only extend path if necessary
         Vector2f chunkCenter = getChunkCenter(chunk, CHUNK_SIZE * (SCALE / 4));
-        while (furthestPoint().distance(chunkCenter) < (CHUNK_SIZE * (SCALE / 4)) * 1.5f) {
+        while (furthestPoint().distance(new Vector2f(cam.getLocation().x, cam.getLocation().z)) < (CHUNK_SIZE * (SCALE / 4)) * 3f) {
             extendPath();
+            //System.out.println("extended road for chunk: " + chunk);
         }
+        //System.out.println("finished extending road for chunk: " + chunk);
 
         // Now fetch road points
         List<Vector2f> roadPoints = getPointsInChunk(chunk, (int) (CHUNK_SIZE * (SCALE / 4)));
+        //System.out.println("got points for chunk: " + chunk);
 
         if (roadPoints.size() >= 2) {
             //System.out.println("chunk: (" + chunk.x + ", " + chunk.z + ")");
@@ -271,6 +255,7 @@ public class RoadGenerator extends SimpleApplication {
         } else {
             roads = null;
         }
+        //System.out.println("road construction finished for chunk: " + chunk);
         return roads;
     }
 
