@@ -1,12 +1,9 @@
 package jMonkeyEngine.Road;
 
 import com.jme3.app.SimpleApplication;
-import com.jme3.bullet.BulletAppState;
+import com.jme3.asset.AssetManager;
 import com.jme3.bullet.collision.shapes.MeshCollisionShape;
 import com.jme3.bullet.control.RigidBodyControl;
-import com.jme3.font.BitmapText;
-import com.jme3.light.AmbientLight;
-import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
@@ -17,22 +14,13 @@ import com.jme3.scene.Mesh;
 import com.jme3.scene.VertexBuffer;
 import com.jme3.util.BufferUtils;
 import jMonkeyEngine.Chunks.ChunkCoord;
-import jMonkeyEngine.Chunks.ChunkManager;
-import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-public class RoadGenerator extends SimpleApplication {
-    BulletAppState bulletAppState;
-    ExecutorService executor;
+public class RoadGenerator {
+    private final AssetManager assetManager;
 
-    TerrainGenerator generator;
-    ChunkManager manager;
-    RoadConstuctor constuctor;
-
-    private BitmapText chunkX;
-    private BitmapText chunkZ;
+    private final RoadConstuctor constructor;
+    private final SimpleApplication main;
 
     private List<Vector2f> pathPoints = Collections.synchronizedList(new ArrayList<>());
     private final float segmentLength = 10f;
@@ -41,79 +29,25 @@ public class RoadGenerator extends SimpleApplication {
     private Vector2f currentPosition = new Vector2f(0, 0);
 
     private Random rand = new Random();
-    private final float maxTurnAngle = 15f;
+    private final float maxTurnAngle = 25f;
 
-    private final int CHUNK_SIZE = 40;
-    private final float SCALE = 20f;
+    private final int CHUNK_SIZE;
+    private final float SCALE;
 
-    private final float ROAD_WIDTH = 10f;
+    private final float ROAD_WIDTH;
 
-    public static void main(String[] args) {
-        RoadGenerator app = new RoadGenerator();
-        app.start();
-    }
 
-    public RoadGenerator() {
+    public RoadGenerator(AssetManager assetManager, SimpleApplication main, int chunkSize, float scale, float roadWidth) {
+        this.assetManager = assetManager;
+        this.main = main;
+
         pathPoints.add(currentPosition.clone()); // starting point
-    }
 
-    @Override
-    public void simpleInitApp() {
-        executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        CHUNK_SIZE = chunkSize;
+        SCALE = scale;
+        ROAD_WIDTH = roadWidth;
 
-        viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
-        flyCam.setEnabled(true);
-
-        bulletAppState = new BulletAppState();
-        stateManager.attach(bulletAppState);
-        bulletAppState.setDebugEnabled(true);
-
-        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, this, this, executor, CHUNK_SIZE, SCALE, 1, 987654567L);
-        this.manager =
-                new ChunkManager(rootNode, bulletAppState, generator, this, this, executor, CHUNK_SIZE,
-                                 SCALE, 1);
-        generator.setChunkManager(manager);
-        this.constuctor = new RoadConstuctor(CHUNK_SIZE, SCALE, ROAD_WIDTH, this, assetManager);
-
-        setUpLight();
-        //generator.CreateTerrain();
-
-        flyCam.setEnabled(true);
-        flyCam.setMoveSpeed(300);
-
-        cam.setLocation(new Vector3f(32, 500, 32));
-        cam.lookAt(Vector3f.ZERO, Vector3f.UNIT_Y);
-
-        guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
-        chunkX = new BitmapText(guiFont, false);
-        chunkX.setSize(guiFont.getCharSet().getRenderedSize());
-        chunkX.setLocalTranslation(10, cam.getHeight() - 10, 0);
-        guiNode.attachChild(chunkX);
-
-        chunkZ = new BitmapText(guiFont, false);
-        chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
-        chunkZ.setLocalTranslation(10, cam.getHeight() - 50, 0);
-        guiNode.attachChild(chunkZ);
-    }
-
-    @Override
-    public void simpleUpdate(float tpf) {
-        manager.updateChunks(cam.getLocation());
-
-        chunkX.setText(String.format("X Coord: %.1f", Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 4)))));
-        chunkZ.setText(String.format("Z Coord: %.1f", Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 4)))));
-    }
-
-    private void setUpLight() {
-        // We add light so we see the scene
-        AmbientLight al = new AmbientLight();
-        al.setColor(ColorRGBA.White.mult(1.3f));
-        rootNode.addLight(al);
-
-        DirectionalLight dl = new DirectionalLight();
-        dl.setColor(ColorRGBA.White);
-        dl.setDirection(new Vector3f(2.8f, -2.8f, -2.8f).normalizeLocal());
-        rootNode.addLight(dl);
+        this.constructor = new RoadConstuctor(CHUNK_SIZE, SCALE, ROAD_WIDTH, this, assetManager);
     }
 
     public Geometry generateStraightRoad(int length, float width, float scale, float[][] terrain, int zOffSet) {
@@ -237,7 +171,7 @@ public class RoadGenerator extends SimpleApplication {
 
         // Only extend path if necessary
         Vector2f chunkCenter = getChunkCenter(chunk, CHUNK_SIZE * (SCALE / 4));
-        while (furthestPoint().distance(new Vector2f(cam.getLocation().x, cam.getLocation().z)) < (CHUNK_SIZE * (SCALE / 4)) * 3f) {
+        while (furthestPoint().distance(new Vector2f(main.getCamera().getLocation().x, main.getCamera().getLocation().z)) < (CHUNK_SIZE * (SCALE / 4)) * 3f) {
             extendPath();
             //System.out.println("extended road for chunk: " + chunk);
         }
@@ -251,7 +185,7 @@ public class RoadGenerator extends SimpleApplication {
             //System.out.println("chunk: (" + chunk.x + ", " + chunk.z + ")");
 //            System.out.println("first point in chunk: " + roadPoints.get(0));
 //            System.out.println("last point in chunk: " + roadPoints.get(roadPoints.size() - 1));
-            roads = constuctor.onChunkLoad(chunk, roadPoints, terrain);
+            roads = constructor.onChunkLoad(chunk, roadPoints, terrain);
         } else {
             roads = null;
         }

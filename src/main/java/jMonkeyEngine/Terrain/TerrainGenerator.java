@@ -132,9 +132,9 @@ public class TerrainGenerator{
         chunkGeom.setMaterial(mat);
 
         chunkGeom.setLocalTranslation(
-                chunk.x * (chunkSize - 0.9f) * (scale / 4),
+                chunk.x * (chunkSize - 1f) * (scale / 4),
                 0,
-                chunk.z * (chunkSize - 0.9f) * (scale / 4)
+                chunk.z * (chunkSize - 1f) * (scale / 4)
         );
 
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
@@ -147,57 +147,53 @@ public class TerrainGenerator{
     public void CreateTerrain() {
         chunkTasks = new ArrayList<>();
 
-        for (int chunkZ = -renderDistance; chunkZ <= renderDistance; chunkZ++) {
-            for (int chunkX = -renderDistance; chunkX <= renderDistance; chunkX++) {
-                final ChunkCoord chunk = new ChunkCoord(chunkX, chunkZ);
+        final ChunkCoord chunk = new ChunkCoord(0, 0);
 
-                Future<?> future = executor.submit(() -> {
-                    try {
-                        float[][] terrain = generateHeightMap(chunkSize, scale, chunk);
-                        Mesh mesh = generateChunkMesh(terrain, chunkSize, scale);
-                        Geometry chunkGeom = createGeometry(chunk, mesh);
+        Future<?> future = executor.submit(() -> {
+            try {
+                float[][] terrain = generateHeightMap(chunkSize, scale, chunk);
+                Mesh mesh = generateChunkMesh(terrain, chunkSize, scale);
+                Geometry chunkGeom = createGeometry(chunk, mesh);
 
-                        int zOffSet = (int) (chunk.z * ((chunkSize - 1) * (scale / 4)));
-                        int xOffSet = (int) (chunk.x * ((chunkSize - 1) * (scale / 4)));
-//                        if (finalChunkX == 0) {
-//                            r = generator.generateStraightRoad(50, 10f, 10f, terrain, zOffSet);
-//                            System.out.println("generated generator");
-//                        } else {
-//                            r = null;
-//                        }
+                int zOffSet = (int) (chunk.z * ((chunkSize - 1) * (scale / 4)));
+                int xOffSet = (int) (chunk.x * ((chunkSize - 1) * (scale / 4)));
+//                if (finalChunkX == 0) {
+//                    r = generator.generateStraightRoad(50, 10f, 10f, terrain, zOffSet);
+//                    System.out.println("generated generator");
+//                } else {
+//                    r = null;
+//                }
 
-                        main.enqueue(() -> {
-                            List<Geometry> roads = generator.buildRoad(chunk, terrain);
+                main.enqueue(() -> {
+                    List<Geometry> roads = generator.buildRoad(chunk, terrain);
 
-                            manager.addChunk(chunk, chunkGeom);
-                            rootNode.attachChild(chunkGeom);
-                            bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
+                    manager.addChunk(chunk, chunkGeom);
+                    rootNode.attachChild(chunkGeom);
+                    bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
 
-                            if (roads != null) {
-                                for (Geometry r : roads) {
-                                    rootNode.attachChild(r);
-                                    bulletAppState.getPhysicsSpace()
-                                            .add(r.getControl(RigidBodyControl.class));
-                                }
-                                manager.addRoad(chunk, roads);
-                            }
-
-//                            if (finalChunkX == 0) {
-//                                rootNode.attachChild(r);
-//                                bulletAppState.getPhysicsSpace()
-//                                        .add(r.getControl(RigidBodyControl.class));
-//                                System.out.println("Attaching generator at Z = " + (finalChunkZ * chunkSize * (scale / 4f)));
-//                            }
-                            return null;
-                        });
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                    if (roads != null) {
+                        for (Geometry r : roads) {
+                            rootNode.attachChild(r);
+                            bulletAppState.getPhysicsSpace()
+                                    .add(r.getControl(RigidBodyControl.class));
+                        }
+                        manager.addRoad(chunk, roads);
                     }
-                });
 
-                chunkTasks.add(future);
+//                    if (finalChunkX == 0) {
+//                        rootNode.attachChild(r);
+//                        bulletAppState.getPhysicsSpace()
+//                                .add(r.getControl(RigidBodyControl.class));
+//                        System.out.println("Attaching generator at Z = " + (finalChunkZ * chunkSize * (scale / 4f)));
+//                    }
+                    return null;
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        }
+        });
+
+        chunkTasks.add(future);
     }
 
     public List<Future<?>> getChunkTasks() {

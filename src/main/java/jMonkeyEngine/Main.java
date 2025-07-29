@@ -11,7 +11,9 @@ import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.math.*;
 import jMonkeyEngine.Entities.Car;
-import jMonkeyEngine.Terrain.ChunkManager;
+import jMonkeyEngine.Chunks.ChunkManager;
+import jMonkeyEngine.Road.RoadConstuctor;
+import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,6 +27,7 @@ public class Main extends SimpleApplication
 
     TerrainGenerator generator;
     ChunkManager manager;
+    RoadGenerator road;
 
     private Car car;
 
@@ -34,15 +37,18 @@ public class Main extends SimpleApplication
     private BitmapText rearLeftText;
     private BitmapText rearRightText;
     private BitmapText loadingText;
+    private BitmapText chunkX;
+    private BitmapText chunkZ;
 
     private boolean loadingDone = false;
 
     private Vector3f cameraPos = new Vector3f();
 
-    int chunkSize = 50;
-    float scale = 25f;
-    int renderDistance = 5;
-    long seed = 1234L;
+    private final int CHUNK_SIZE = 50;
+    private final float SCALE = 40f;
+
+    private final float ROAD_WIDTH = 10f;
+    private long SEED;
 
     public static void main(String[] args) {
         Main app = new Main();
@@ -53,6 +59,9 @@ public class Main extends SimpleApplication
     public void simpleInitApp() {
         executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
+        SEED = FastMath.nextRandomInt(0, 1000000000);
+        System.out.println("Seed: " + SEED);
+
         viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
         enablePlayerControls(false);
         flyCam.setEnabled(true);
@@ -61,10 +70,12 @@ public class Main extends SimpleApplication
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
 
-        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, this, executor, chunkSize, scale, renderDistance, seed);
+        road = new RoadGenerator(assetManager, this, CHUNK_SIZE, SCALE, ROAD_WIDTH);
+        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, road, this, executor,
+                                         CHUNK_SIZE, SCALE, 1, SEED);
         this.manager =
-                new ChunkManager(rootNode, bulletAppState, generator, this, executor, chunkSize,
-                                 scale, renderDistance);
+                new ChunkManager(bulletAppState, rootNode, road, generator, this, executor, CHUNK_SIZE,
+                                 SCALE, 1);
         generator.setChunkManager(manager);
 
         setUpKeys();
@@ -107,6 +118,16 @@ public class Main extends SimpleApplication
         loadingText.setText("Loading terrain...");
         loadingText.setLocalTranslation(300, 300, 0);
         guiNode.attachChild(loadingText);
+
+        chunkX = new BitmapText(guiFont, false);
+        chunkX.setSize(guiFont.getCharSet().getRenderedSize());
+        chunkX.setLocalTranslation(10, cam.getHeight() - 10, 0);
+        guiNode.attachChild(chunkX);
+
+        chunkZ = new BitmapText(guiFont, false);
+        chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
+        chunkZ.setLocalTranslation(10, cam.getHeight() - 50, 0);
+        guiNode.attachChild(chunkZ);
     }
 
     private void loadScene() {
@@ -128,6 +149,15 @@ public class Main extends SimpleApplication
 
     private void initCar() {
         car = new Car(assetManager, bulletAppState.getPhysicsSpace());
+        // Set desired spawn location
+        Vector3f spawnPosition = new Vector3f(2f, 10f, -2f); // <-- change this
+
+        // Apply to the physics control (VehicleControl or similar)
+        car.getControl().setPhysicsLocation(spawnPosition);
+
+        // Optionally also apply to the visual node (if needed)
+        car.getCarNode().setLocalTranslation(spawnPosition);
+
         rootNode.attachChild(car.getCarNode());
     }
 
@@ -225,6 +255,8 @@ public class Main extends SimpleApplication
             frontRightText.setText(String.format("FR: %.1f", control.getWheel(1).getFrictionSlip()));
             rearLeftText.setText(String.format("RL: %.1f", control.getWheel(2).getFrictionSlip()));
             rearRightText.setText(String.format("RR: %.1f", control.getWheel(3).getFrictionSlip()));
+            chunkX.setText(String.format("X Coord: %.1f", Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 4)))));
+            chunkZ.setText(String.format("Z Coord: %.1f", Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 4)))));
         }
     }
 

@@ -30,8 +30,8 @@ public class ChunkManager {
     private final Map<ChunkCoord, Geometry> loadedChunks = new HashMap<>();
     private final HashMap<ChunkCoord, List<Geometry>> loadedRoads = new HashMap<>();
 
-    public ChunkManager(Node rootNode, BulletAppState bulletAppState,
-                        TerrainGenerator generator, RoadGenerator road, SimpleApplication main, ExecutorService executor,
+    public ChunkManager(BulletAppState bulletAppState, Node rootNode, RoadGenerator road,
+                        TerrainGenerator generator, SimpleApplication main, ExecutorService executor,
                         int chunkSize,
                         float scale, int renderDistance) {
         this.rootNode = rootNode;

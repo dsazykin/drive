@@ -41,20 +41,24 @@ public class RoadConstuctor {
     }
 
     protected Geometry buildRoad(List<Vector2f> path, float[][] terrain, ChunkCoord chunk,
-                         Vector3f chunkEntryLeft, Vector3f chunkEntryRight) {
+                                 Vector3f chunkEntryLeft, Vector3f chunkEntryRight) {
 
-        boolean notFirst = (chunkEntryLeft != null || chunkEntryRight != null);
-        //System.out.println("built road for chunk: " + chunk);
+        boolean notFirst = (chunkEntryLeft != null && chunkEntryRight != null);
 
         int extraVerts = notFirst ? 2 : 0;
         int vertexCount = path.size() * 2 + extraVerts;
+
         Vector3f[] vertices = new Vector3f[vertexCount];
         ColorRGBA[] colors = new ColorRGBA[vertexCount];
 
+        int vertexIndex = 0;
+
+        // Add previous chunk's end vertices
         if (notFirst) {
-            vertices[0] = chunkEntryLeft;
-            vertices[1] = chunkEntryRight;
-            colors[0] = colors[1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
+            vertices[vertexIndex] = chunkEntryLeft;
+            vertices[vertexIndex + 1] = chunkEntryRight;
+            colors[vertexIndex] = colors[vertexIndex + 1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
+            vertexIndex += 2;
         }
 
         for (int i = 0; i < path.size(); i++) {
@@ -66,43 +70,33 @@ public class RoadConstuctor {
             } else if (i > 0) {
                 dir = center.subtract(path.get(i - 1)).normalize();
             } else {
-                dir = new Vector2f(1, 0); // fallback if path has only one point
+                dir = new Vector2f(1, 0); // fallback
             }
 
             Vector2f left2D = new Vector2f(-dir.y, dir.x).mult(ROAD_WIDTH / 2f);
             Vector2f leftPt = center.add(left2D);
             Vector2f rightPt = center.subtract(left2D);
 
-            float centerHeight =
-                    sampleHeight(center, terrain, chunk.x, chunk.z);
-            float heightOffset = 0.1f;
+            float height = Math.max(
+                    sampleHeight(leftPt, terrain, chunk.x, chunk.z),
+                    sampleHeight(rightPt, terrain, chunk.x, chunk.z)
+            ) + 0.1f;
 
-            float leftHeight = sampleHeight(leftPt, terrain, chunk.x, chunk.z);
-            float rightHeight = sampleHeight(rightPt, terrain, chunk.x, chunk.z);
+            Vector3f leftVector = new Vector3f(leftPt.x, height, leftPt.y);
+            Vector3f rightVector = new Vector3f(rightPt.x, height, rightPt.y);
 
-            float height = Math.max(leftHeight, rightHeight);
+            vertices[vertexIndex] = leftVector;
+            vertices[vertexIndex + 1] = rightVector;
+            colors[vertexIndex] = colors[vertexIndex + 1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
+            vertexIndex += 2;
 
-//            System.out.printf("Chunk %s - Road center: %.2f, %.2f | chunkOrigin: %.2f, %.2f%n",
-//                              chunk, center.x, center.y, chunk.x * CHUNK_SIZE * (SCALE / 4),
-//                              chunk.z * CHUNK_SIZE * (SCALE / 4));
-
-            Vector3f leftVector = new Vector3f(leftPt.x, height + heightOffset, leftPt.y);
-            Vector3f rightVector =
-                    new Vector3f(rightPt.x, height + heightOffset, rightPt.y);
-
-            int vi = i * 2 + extraVerts;
-            vertices[vi] = leftVector;
-            vertices[vi + 1] = rightVector;
-            colors[vi] = colors[vi + 1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
-
-            // Save for next chunk to continue from here
             if (i == path.size() - 1) {
-                exitPointMap.put(chunk,
-                                 new RoadEndpoint(leftVector, rightVector));
+                exitPointMap.put(chunk, new RoadEndpoint(leftVector, rightVector));
             }
         }
 
-        int segmentCount = path.size() - 1 + (notFirst ? 1 : 0);
+        // total segments = number of vertex pairs - 1
+        int segmentCount = (vertexCount / 2) - 1;
         int[] indices = new int[segmentCount * 6];
 
         int idx = 0;
@@ -115,6 +109,7 @@ public class RoadConstuctor {
             indices[idx++] = v0;
             indices[idx++] = v2;
             indices[idx++] = v1;
+
             indices[idx++] = v1;
             indices[idx++] = v2;
             indices[idx++] = v3;
