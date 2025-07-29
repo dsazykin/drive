@@ -1,5 +1,6 @@
 package jMonkeyEngine.Terrain;
 
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -11,7 +12,10 @@ public class HeightMapGenerator {
             throws IOException {
         float[][] heightmap = new float[width][height];
 
-        //BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+
+        float max = -1;
+        float min = 2;
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
@@ -19,35 +23,78 @@ public class HeightMapGenerator {
                 double worldX = (chunkX * (width - 1) + x) / scale;
                 double worldY = (chunkZ * (height - 1) + y) / scale;
 
-                float e = 20f * OpenSimplex2.noise2(seed, 0.1f * worldX, 0.1f * worldY) +
+                float e = 100f * OpenSimplex2.noise2(seed, 0.07f * worldX, 0.07f * worldY) +
                         4f  * OpenSimplex2.noise2(seed, 0.25f * worldX, 0.25f * worldY) +
                         0.6f * OpenSimplex2.noise2(seed, 0.75f * worldX, 0.75f * worldY);
 
-                e = e / (20f + 4f + 0.6f);
+                e = e / (100f + 4f + 0.6f);
+
+                // Shift to [0, 1]
+                e = (e + 1f) / 2f;
+
+                if (e > max) {
+                    max = e;
+                }
+
+                if (e < min) {
+                    min = e;
+                }
 
                 heightmap[x][y] = e;
 
                 // Visualization
-//                double noiseValue = heightmap[x][y]; // range [-1,1]
-//                int grayscale = (int) ((noiseValue + 1) / 2 * 255);
-//                grayscale = Math.max(0, Math.min(255, grayscale));
-//
-//                int rgb = (grayscale << 16) | (grayscale << 8) | grayscale;
-//                image.setRGB(x, y, rgb);
+                double noiseValue = heightmap[x][y]; // range [0,1]
+                int rgb;
+                if (noiseValue < 0.1) {
+                    // Water (blue)
+                    rgb = new Color(0, 0, 255).getRGB();
+                } else if (noiseValue < 0.2) {
+                    // Beach (yellow)
+                    rgb = new Color(211, 169, 108).getRGB(); // sand yellow
+                } else if (noiseValue < 0.3) {
+                    // Grassland (green)
+                    rgb = new Color(34, 175, 34).getRGB(); // forest green
+                } else if (noiseValue < 0.4) {
+                    // Grassland (green)
+                    rgb = new Color(34, 125, 34).getRGB(); // forest green
+                } else if (noiseValue < 0.5) {
+                    // Grassland (green)
+                    rgb = new Color(34, 100, 25).getRGB(); // forest green
+                } else if (noiseValue < 0.6) {
+                    // Grassland (green)
+                    rgb = new Color(75, 80, 30).getRGB(); // forest green
+                } else if (noiseValue < 0.7) {
+                    // Grassland (green)
+                    rgb = new Color(90, 75, 20).getRGB(); // forest green
+                } else if (noiseValue < 0.8) {
+                    // Grassland (green)
+                    rgb = new Color(110, 70, 20).getRGB(); // forest green
+                } else if (noiseValue < 0.9) {
+                    // Mountain (brown)
+                    rgb = new Color(139, 69, 19).getRGB(); // saddle brown
+                } else {
+                    // Snow (white)
+                    rgb = new Color(255, 255, 255).getRGB();
+                }
+
+                image.setRGB(x, y, rgb);
             }
         }
 
-//        String folderPath = "generated_noise";
-//        File directory = new File(folderPath);
-//        if (!directory.exists()) {
-//            directory.mkdirs();
-//        }
-//
+        System.out.println(max);
+        System.out.println(min);
+
+        String folderPath = "generated_noise";
+        File directory = new File(folderPath);
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+
 //        File outputFile = new File(directory, "noise_chunk_" + chunkX + "_" + chunkZ + ".png");
 //        ImageIO.write(image, "png", outputFile);
 //        System.out.println("Noise image saved to: " + outputFile.getAbsolutePath());
-
-        //System.out.println("Noise image saved as noise_chunk_" + chunkX + "_" + chunkZ + ".png");
+//
+//        System.out.println("Noise image saved as noise_chunk_" + chunkX + "_" + chunkZ + ".png");
 
         return heightmap;
     }
@@ -58,10 +105,6 @@ public class HeightMapGenerator {
         long seed = 1234L;
         float[][] heightmap;
 
-        for (int x = -1; x < 2; x++) {
-            for (int z = -1; z < 2; z++) {
-                heightmap = generator.generateHeightmap(200, 200, seed, 100, x, z);
-            }
-        }
+        heightmap = generator.generateHeightmap(1500, 1500, seed, 40, 0, 0);
     }
 }
