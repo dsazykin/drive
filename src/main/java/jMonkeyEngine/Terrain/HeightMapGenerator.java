@@ -2,6 +2,7 @@ package jMonkeyEngine.Terrain;
 
 import com.jme3.math.FastMath;
 import com.jme3.math.Vector2f;
+import jMonkeyEngine.Road.RoadGenerator;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -97,13 +98,15 @@ public class HeightMapGenerator {
 
     public static void main(String[] args) throws IOException {
         HeightMapGenerator generator = new HeightMapGenerator();
+        RoadGenerator road = new RoadGenerator(500, 40, seed);
         float[][] heightmap;
 
         //heightmap = generator.generateHeightmap(500, 500, seed, 40, 0, 0);
 
         for (int x = -1; x < 2; x++) {
             for (int z = -1; z < 2; z++) {
-//                heightmap = generator.generateHeightmap(500, 500, seed, 40, x, z);
+                List<Vector2f> pathPoints = road.getRoadPointsInChunk(x, z);
+                heightmap = generator.generateHeightmap(500, 500, seed, 40, x, z, pathPoints);
             }
         }
     }

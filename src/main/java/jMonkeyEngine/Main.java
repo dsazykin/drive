@@ -71,7 +71,7 @@ public class Main extends SimpleApplication
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
 
-        road = new RoadGenerator(assetManager, this, CHUNK_SIZE, SCALE, 100, SEED, ROAD_WIDTH);
+        road = new RoadGenerator(CHUNK_SIZE, SCALE, SEED);
         generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, road, this, executor,
                                          CHUNK_SIZE, SCALE, 5, SEED, 100);
         this.manager =

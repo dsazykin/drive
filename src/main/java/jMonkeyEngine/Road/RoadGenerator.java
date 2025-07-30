@@ -11,40 +11,23 @@ import java.util.List;
 import java.util.Random;
 
 public class RoadGenerator {
-    private final AssetManager assetManager;
-
-    private final SimpleApplication main;
-
     private List<Vector2f> pathPoints = Collections.synchronizedList(new ArrayList<>());
-    private final float segmentLength = 10f;
-    private float currentAngle = 0f;
-    private float turnVelocity = 0f;// in degrees
     private Vector2f currentPosition = new Vector2f(0, 0);
-
-    private Random rand = new Random();
-    private final float maxTurnAngle = 25f;
 
     private final int CHUNK_SIZE;
     private final float SCALE;
-    private final int MAX_HEIGHT;
     private final long SEED;
 
-    private final float ROAD_WIDTH;
     private final float STEP_SIZE = 0.01f;
     private final float FREQ = 0.6f;
 
-    public RoadGenerator(AssetManager assetManager, SimpleApplication main, int chunkSize, float scale,
-                         int maxHeight, long seed, float roadWidth) {
-        this.assetManager = assetManager;
-        this.main = main;
-
+    public RoadGenerator(int chunkSize, float scale,
+                         long seed) {
         pathPoints.add(currentPosition.clone()); // starting point
 
         CHUNK_SIZE = chunkSize;
         SCALE = scale;
-        MAX_HEIGHT = maxHeight;
         SEED = seed;
-        ROAD_WIDTH = roadWidth;
     }
 
     private float angleAt(Vector2f pos) {
