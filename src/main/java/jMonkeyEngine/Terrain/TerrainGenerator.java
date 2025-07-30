@@ -7,6 +7,7 @@ import com.jme3.bullet.collision.shapes.MeshCollisionShape;
 import com.jme3.bullet.control.RigidBodyControl;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
+import com.jme3.math.Vector2f;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
@@ -63,8 +64,8 @@ public class TerrainGenerator{
         this.manager = manager;
     }
 
-    public float[][] generateHeightMap(int size, double scale, ChunkCoord chunk) throws IOException {
-        return heightMap.generateHeightmap(size, size, seed, scale, chunk.x, chunk.z);
+    public float[][] generateHeightMap(int size, double scale, ChunkCoord chunk, List<Vector2f> pathPoints) throws IOException {
+        return heightMap.generateHeightmap(size, size, seed, scale, chunk.x, chunk.z, pathPoints);
     }
 
     public Mesh generateChunkMesh(float[][] terrain, int size, double scale)
@@ -99,6 +100,11 @@ public class TerrainGenerator{
                     color = new ColorRGBA(139f / 255f, 69f / 255f, 19f / 255f, 1f); // Mountain (brown)
                 } else {
                     color = new ColorRGBA(1f, 1f, 1f, 1f); // Snow (white)
+                }
+
+                if (height > 1) {
+                    height -= 2;
+                    color = new ColorRGBA(120f / 255f, 120f / 255f, 120f / 255f, 1f);
                 }
 
                 colors[vertexIndex] = color;
@@ -166,41 +172,16 @@ public class TerrainGenerator{
 
         Future<?> future = executor.submit(() -> {
             try {
-                float[][] terrain = generateHeightMap(chunkSize, scale, chunk);
+                List<Vector2f> pathPoints = generator.getRoadPointsInChunk(chunk.x, chunk.z);
+                float[][] terrain = generateHeightMap(chunkSize, scale, chunk, pathPoints);
                 Mesh mesh = generateChunkMesh(terrain, chunkSize, scale);
                 Geometry chunkGeom = createGeometry(chunk, mesh);
 
-                int zOffSet = (int) (chunk.z * ((chunkSize - 1) * (scale / 8)));
-                int xOffSet = (int) (chunk.x * ((chunkSize - 1) * (scale / 8)));
-//                if (finalChunkX == 0) {
-//                    r = generator.generateStraightRoad(50, 10f, 10f, terrain, zOffSet);
-//                    System.out.println("generated generator");
-//                } else {
-//                    r = null;
-//                }
-
                 main.enqueue(() -> {
-                    List<Geometry> roads = generator.buildRoad(chunk, terrain);
-
                     manager.addChunk(chunk, chunkGeom);
                     rootNode.attachChild(chunkGeom);
                     bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
 
-                    if (roads != null) {
-                        for (Geometry r : roads) {
-                            rootNode.attachChild(r);
-                            bulletAppState.getPhysicsSpace()
-                                    .add(r.getControl(RigidBodyControl.class));
-                        }
-                        manager.addRoad(chunk, roads);
-                    }
-
-//                    if (finalChunkX == 0) {
-//                        rootNode.attachChild(r);
-//                        bulletAppState.getPhysicsSpace()
-//                                .add(r.getControl(RigidBodyControl.class));
-//                        System.out.println("Attaching generator at Z = " + (finalChunkZ * chunkSize * (scale / 4f)));
-//                    }
                     return null;
                 });
             } catch (Exception e) {

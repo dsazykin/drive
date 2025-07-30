@@ -9,10 +9,11 @@ import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.KeyTrigger;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
-import com.jme3.math.*;
-import jMonkeyEngine.Entities.Car;
+import com.jme3.math.ColorRGBA;
+import com.jme3.math.FastMath;
+import com.jme3.math.Vector3f;
 import jMonkeyEngine.Chunks.ChunkManager;
-import jMonkeyEngine.Road.RoadConstuctor;
+import jMonkeyEngine.Entities.Car;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.concurrent.ExecutorService;
@@ -65,12 +66,12 @@ public class Main extends SimpleApplication
         viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
         enablePlayerControls(false);
         flyCam.setEnabled(true);
-        flyCam.setMoveSpeed(100);
+        flyCam.setMoveSpeed(300);
 
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
 
-        road = new RoadGenerator(assetManager, this, CHUNK_SIZE, SCALE, 100, ROAD_WIDTH);
+        road = new RoadGenerator(assetManager, this, CHUNK_SIZE, SCALE, 100, SEED, ROAD_WIDTH);
         generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, road, this, executor,
                                          CHUNK_SIZE, SCALE, 5, SEED, 100);
         this.manager =

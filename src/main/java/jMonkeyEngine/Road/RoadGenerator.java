@@ -2,24 +2,17 @@ package jMonkeyEngine.Road;
 
 import com.jme3.app.SimpleApplication;
 import com.jme3.asset.AssetManager;
-import com.jme3.bullet.collision.shapes.MeshCollisionShape;
-import com.jme3.bullet.control.RigidBodyControl;
-import com.jme3.material.Material;
-import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
 import com.jme3.math.Vector2f;
-import com.jme3.math.Vector3f;
-import com.jme3.scene.Geometry;
-import com.jme3.scene.Mesh;
-import com.jme3.scene.VertexBuffer;
-import com.jme3.util.BufferUtils;
-import jMonkeyEngine.Chunks.ChunkCoord;
-import java.util.*;
+import jMonkeyEngine.Terrain.OpenSimplex2;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
 
 public class RoadGenerator {
     private final AssetManager assetManager;
 
-    private final RoadConstuctor constructor;
     private final SimpleApplication main;
 
     private List<Vector2f> pathPoints = Collections.synchronizedList(new ArrayList<>());
@@ -34,12 +27,14 @@ public class RoadGenerator {
     private final int CHUNK_SIZE;
     private final float SCALE;
     private final int MAX_HEIGHT;
+    private final long SEED;
 
     private final float ROAD_WIDTH;
-
+    private final float STEP_SIZE = 0.01f;
+    private final float FREQ = 0.6f;
 
     public RoadGenerator(AssetManager assetManager, SimpleApplication main, int chunkSize, float scale,
-                         int maxHeight, float roadWidth) {
+                         int maxHeight, long seed, float roadWidth) {
         this.assetManager = assetManager;
         this.main = main;
 
@@ -48,162 +43,45 @@ public class RoadGenerator {
         CHUNK_SIZE = chunkSize;
         SCALE = scale;
         MAX_HEIGHT = maxHeight;
+        SEED = seed;
         ROAD_WIDTH = roadWidth;
-
-        this.constructor = new RoadConstuctor(CHUNK_SIZE, SCALE, MAX_HEIGHT, ROAD_WIDTH, this,
-                                              assetManager);
     }
 
-    public Geometry generateStraightRoad(int length, float width, float scale, float[][] terrain, int zOffSet) {
-        Vector3f[] vertices = new Vector3f[length * 2];
-        int[] indices = new int[(length - 1) * 6];
-        ColorRGBA[] colors = new ColorRGBA[vertices.length];
-
-        for (int i = 0; i < length; i++) {
-            float height = (terrain[0][i] * 50f); // Sample noise-based terrain
-
-            int zLocal = (int) (i * scale);
-
-            // Two points per segment (left/right edges of the road)
-            vertices[i * 2] = new Vector3f(-width / 2f, height + 0.05f, zLocal + zOffSet); // Left
-            vertices[i * 2 + 1] = new Vector3f(width / 2f, height + 0.05f, zLocal + zOffSet); // Right
-
-            // dark gray color for road
-            colors[i * 2] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
-            colors[i * 2 + 1] = new ColorRGBA(0.2f, 0.2f, 0.2f, 1f);
-        }
-
-        // Build triangles
-        int index = 0;
-        for (int i = 0; i < length - 1; i++) {
-            int v0 = i * 2;
-            int v1 = v0 + 1;
-            int v2 = v0 + 2;
-            int v3 = v0 + 3;
-
-            // Triangle 1
-            indices[index++] = v0;
-            indices[index++] = v2;
-            indices[index++] = v1;
-
-            // Triangle 2
-            indices[index++] = v1;
-            indices[index++] = v2;
-            indices[index++] = v3;
-        }
-
-        Mesh roadMesh = new Mesh();
-        roadMesh.setBuffer(VertexBuffer.Type.Position, 3, BufferUtils.createFloatBuffer(vertices));
-        roadMesh.setBuffer(VertexBuffer.Type.Index, 3, BufferUtils.createIntBuffer(indices));
-        roadMesh.setBuffer(VertexBuffer.Type.Color, 4, BufferUtils.createFloatBuffer(colors));
-        roadMesh.updateBound();
-
-        Geometry road = new Geometry("Road", roadMesh);
-        Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
-        mat.setBoolean("VertexColor", true);
-        road.setMaterial(mat);
-
-        MeshCollisionShape roadShape = new MeshCollisionShape(roadMesh);
-        RigidBodyControl roadPhysics = new RigidBodyControl(roadShape, 0);
-        road.addControl(roadPhysics);
-
-        return road;
+    private float angleAt(Vector2f pos) {
+        return (float) (OpenSimplex2.noise2(SEED + 5678, pos.x * FREQ, pos.y * FREQ) * Math.PI);
     }
 
-    public void generateInitialPath() {
-        while (furthestPoint().distance(new Vector2f(0, 0)) < 500 * 3f) {
-            extendPath();
-        }
-    }
+    // Returns the portion of the road that intersects the chunk bounds
+    public List<Vector2f> getRoadPointsInChunk(int chunkX, int chunkZ) {
+        List<Vector2f> result = new ArrayList<>();
 
-    public void extendPath() {
-        boolean rightDirection = false;
-        Vector2f next = null;
-        while (!rightDirection) {
-            Vector2f last = pathPoints.get(pathPoints.size() - 1);
+        // World bounds of this chunk
+        float minX = chunkX * (CHUNK_SIZE - 1) / SCALE;
+        float maxX = minX + (CHUNK_SIZE - 1) / SCALE;
+        float minZ = chunkZ * (CHUNK_SIZE - 1) / SCALE;
+        float maxZ = minZ + (CHUNK_SIZE - 1) / SCALE;
 
-            // Random target turn in degrees, smoothed over time
-            float targetTurnDeg = (rand.nextFloat() * 2 - 1) * maxTurnAngle;
-            turnVelocity += (targetTurnDeg - turnVelocity) * 0.05f;  // Inertia-like smoothing
+        // Trace from a start point (e.g., (0,0)) until we're well past the current chunk
+        Vector2f pos = new Vector2f(0, 0);
 
-            // Update current direction angle
-            currentAngle += FastMath.DEG_TO_RAD * turnVelocity;
+        for (int i = 0; i < 20000; i++) {
+            float x = pos.x;
+            float z = pos.y;
 
-            // Compute new offset
-            float dx = FastMath.cos(currentAngle) * segmentLength;
-            float dz = FastMath.sin(currentAngle) * segmentLength;
-
-            next = last.add(new Vector2f(dx, dz));
-            if ((next.getY() > last.getY()) && (next.getX() > last.getX())) {
-                rightDirection = true;
+            // Only keep road points that fall within this chunk
+            if (x >= minX - 1 && x <= maxX + 1 && z >= minZ - 1 && z <= maxZ + 1) {
+                result.add(pos.clone());
             }
-        }
-        pathPoints.add(next);
-    }
 
-    public List<Vector2f> getPointsInChunk(ChunkCoord chunk, int chunkSize) {
-        float startX = chunk.x * chunkSize;
-        float endX = startX + chunkSize;
-        float startZ = chunk.z * chunkSize;
-        float endZ = startZ + chunkSize;
+            // Stop once we're well beyond this chunk (to limit trace length)
+            if (x > maxX + 2 && z > maxZ + 2) break;
 
-        List<Vector2f> segment = new ArrayList<>();
-
-        List<Vector2f> snapshot;
-        synchronized (pathPoints) {
-            snapshot = new ArrayList<>(pathPoints);
-        }
-        for (Vector2f p : snapshot) {
-            if (p.x >= startX && p.x < endX && p.y >= startZ && p.y < endZ) {
-                segment.add(p);
-            }
+            // March to next point
+            float angle = angleAt(pos);
+            Vector2f dir = new Vector2f(FastMath.cos(angle), FastMath.sin(angle)).normalizeLocal();
+            pos = pos.add(dir.mult(STEP_SIZE));
         }
 
-        return segment;
-    }
-
-    public Vector2f furthestPoint() {
-        if (pathPoints.isEmpty()) return new Vector2f(0, 0); // Or null, or throw an exception
-        return pathPoints.get(pathPoints.size() - 1);
-    }
-
-    public List<Geometry> buildRoad(ChunkCoord chunk, float[][] terrain) {
-        List<Geometry> roads;
-        if (chunk.x == 0 && chunk.z == 0) {
-            generateInitialPath();
-        }
-
-        // Only extend path if necessary
-        Vector2f chunkCenter = getChunkCenter(chunk, CHUNK_SIZE * (SCALE / 8));
-        while (furthestPoint().distance(new Vector2f(main.getCamera().getLocation().x, main.getCamera().getLocation().z)) < (CHUNK_SIZE * (SCALE / 8)) * 3f) {
-            extendPath();
-            //System.out.println("extended road for chunk: " + chunk);
-        }
-        //System.out.println("finished extending road for chunk: " + chunk);
-
-        // Now fetch road points
-        List<Vector2f> roadPoints = getPointsInChunk(chunk, (int) (CHUNK_SIZE * (SCALE / 8)));
-        //System.out.println("got points for chunk: " + chunk);
-
-        if (roadPoints.size() >= 2) {
-            //System.out.println("chunk: (" + chunk.x + ", " + chunk.z + ")");
-//            System.out.println("first point in chunk: " + roadPoints.get(0));
-//            System.out.println("last point in chunk: " + roadPoints.get(roadPoints.size() - 1));
-            roads = constructor.onChunkLoad(chunk, roadPoints, terrain);
-        } else {
-            roads = null;
-        }
-        //System.out.println("road construction finished for chunk: " + chunk);
-        return roads;
-    }
-
-    public Vector2f getChunkCenter(ChunkCoord chunk, float chunkSize) {
-        float centerX = chunk.x * chunkSize + chunkSize / 2f;
-        float centerZ = chunk.z * chunkSize + chunkSize / 2f;
-        return new Vector2f(centerX, centerZ);
-    }
-
-    public Vector2f getPrevPoint(Vector2f point) {
-        return pathPoints.get(pathPoints.indexOf(point) - 2);
+        return result;
     }
 }
