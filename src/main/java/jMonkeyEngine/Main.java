@@ -73,7 +73,7 @@ public class Main extends SimpleApplication
 
         road = new RoadGenerator(CHUNK_SIZE, SCALE, SEED);
         generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, road, this, executor,
-                                         CHUNK_SIZE, SCALE, 5, SEED, 100);
+                                         CHUNK_SIZE, SCALE, SEED, 100);
         this.manager =
                 new ChunkManager(bulletAppState, rootNode, road, generator, this, executor, CHUNK_SIZE,
                                  SCALE, 5, 100);
@@ -235,20 +235,20 @@ public class Main extends SimpleApplication
             car.move(velocity, speed);
             car.steer(speed, tpf);
 
-            Vector3f forward = control.getForwardVector(null).normalizeLocal();
-
-            // === SMOOTH CAMERA FOLLOW ===
-            Vector3f targetCamPos =
-                    control.getPhysicsLocation().add(forward.negate().mult(-10f)) // 20 units behind
-                            .add(0, 6f, 0);
-
-            // Interpolate camera position
-            float lerpSpeed = 5f; // higher = faster
-            cameraPos.interpolateLocal(targetCamPos, lerpSpeed * tpf);
-            cam.setLocation(cameraPos);
-
-            // Look at the player (can be smoothed as well if needed)
-            cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
+//            Vector3f forward = control.getForwardVector(null).normalizeLocal();
+//
+//            // === SMOOTH CAMERA FOLLOW ===
+//            Vector3f targetCamPos =
+//                    control.getPhysicsLocation().add(forward.negate().mult(-10f)) // 20 units behind
+//                            .add(0, 6f, 0);
+//
+//            // Interpolate camera position
+//            float lerpSpeed = 5f; // higher = faster
+//            cameraPos.interpolateLocal(targetCamPos, lerpSpeed * tpf);
+//            cam.setLocation(cameraPos);
+//
+//            // Look at the player (can be smoothed as well if needed)
+//            cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
 
             speedText.setText(String.format("Speed: %.1f km/h", speed));
 

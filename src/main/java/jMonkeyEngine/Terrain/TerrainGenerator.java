@@ -34,28 +34,26 @@ public class TerrainGenerator{
     private final SimpleApplication main;
     private final ExecutorService executor;
 
-    private final int chunkSize;
-    private final float scale;
-    private final int renderDistance; // Grid size will be (2 * renderDistance - 1)^2
-    private final Long seed;
+    private final int CHUNK_SIZE;
+    private final float SCALE;
+    private final Long SEED;
     private final int MAX_HEIGHT;
 
     private List<Future<?>> chunkTasks;
 
     public TerrainGenerator(BulletAppState bulletAppState,
                             Node rootNode, AssetManager assetManager, RoadGenerator generator, SimpleApplication main,
-                            ExecutorService executor, int chunkSize, float scale,
-                            int renderDistance, Long seed, int maxHeight) {
+                            ExecutorService executor, int chunkSize, float SCALE, Long seed,
+                            int maxHeight) {
         this.bulletAppState = bulletAppState;
         this.rootNode = rootNode;
         this.assetManager = assetManager;
         this.generator = generator;
         this.main = main;
         this.executor = executor;
-        this.chunkSize = chunkSize;
-        this.scale = scale;
-        this.renderDistance = renderDistance;
-        this.seed = seed;
+        this.CHUNK_SIZE = chunkSize;
+        this.SCALE = SCALE;
+        this.SEED = seed;
         MAX_HEIGHT = maxHeight;
         this.heightMap = new HeightMapGenerator();
     }
@@ -65,18 +63,18 @@ public class TerrainGenerator{
     }
 
     public float[][] generateHeightMap(int size, double scale, ChunkCoord chunk, List<Vector2f> pathPoints) throws IOException {
-        return heightMap.generateHeightmap(size, size, seed, scale, chunk.x, chunk.z, pathPoints);
+        return heightMap.generateHeightmap(size, size, SEED, scale, chunk.x, chunk.z, pathPoints);
     }
 
-    public Mesh generateChunkMesh(float[][] terrain, int size, double scale)
+    public Mesh generateChunkMesh(float[][] terrain)
             throws IOException {
         Mesh mesh = new Mesh();
 
-        Vector3f[] vertices = new Vector3f[size * size];
+        Vector3f[] vertices = new Vector3f[CHUNK_SIZE * CHUNK_SIZE];
         ColorRGBA[] colors = new ColorRGBA[vertices.length];
         int vertexIndex = 0;
-        for (int z = 0; z < size; z++) {
-            for (int x = 0; x < size; x++) {
+        for (int z = 0; z < CHUNK_SIZE; z++) {
+            for (int x = 0; x < CHUNK_SIZE; x++) {
                 float height = terrain[x][z];
 
                 ColorRGBA color;
@@ -110,21 +108,21 @@ public class TerrainGenerator{
                 colors[vertexIndex] = color;
 
                 vertices[vertexIndex++] = new Vector3f(
-                        (float) (x * (scale / 8)),
+                        (x * (SCALE / 8)),
                         height * MAX_HEIGHT,
-                        (float) (z * (scale / 8))
+                        (z * (SCALE / 8))
                 );
 
             }
         }
 
-        int[] indices = new int[(size - 1) * (size - 1) * 6];
+        int[] indices = new int[(CHUNK_SIZE - 1) * (CHUNK_SIZE - 1) * 6];
         int indexCount = 0;
-        for (int z = 0; z < size - 1; z++) {
-            for (int x = 0; x < size - 1; x++) {
-                int topLeft = z * size + x;
+        for (int z = 0; z < CHUNK_SIZE - 1; z++) {
+            for (int x = 0; x < CHUNK_SIZE - 1; x++) {
+                int topLeft = z * CHUNK_SIZE + x;
                 int topRight = topLeft + 1;
-                int bottomLeft = topLeft + size;
+                int bottomLeft = topLeft + CHUNK_SIZE;
                 int bottomRight = bottomLeft + 1;
 
                 // First triangle
@@ -153,9 +151,9 @@ public class TerrainGenerator{
         chunkGeom.setMaterial(mat);
 
         chunkGeom.setLocalTranslation(
-                chunk.x * (chunkSize - 1f) * (scale / 8),
+                chunk.x * (CHUNK_SIZE - 1f) * (SCALE / 8),
                 0,
-                chunk.z * (chunkSize - 1f) * (scale / 8)
+                chunk.z * (CHUNK_SIZE - 1f) * (SCALE / 8)
         );
 
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
@@ -173,8 +171,8 @@ public class TerrainGenerator{
         Future<?> future = executor.submit(() -> {
             try {
                 List<Vector2f> pathPoints = generator.getRoadPointsInChunk(chunk.x, chunk.z);
-                float[][] terrain = generateHeightMap(chunkSize, scale, chunk, pathPoints);
-                Mesh mesh = generateChunkMesh(terrain, chunkSize, scale);
+                float[][] terrain = generateHeightMap(CHUNK_SIZE, SCALE, chunk, pathPoints);
+                Mesh mesh = generateChunkMesh(terrain);
                 Geometry chunkGeom = createGeometry(chunk, mesh);
 
                 main.enqueue(() -> {
