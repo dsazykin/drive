@@ -18,8 +18,8 @@ public class HeightMapGenerator {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 
         // === Trace the road path once globally ===
-        float roadWidth = 0.2f;
-        float flattenStrength = 0.1f;
+        float roadWidth = 0.15f;
+        float flattenStrength = 0.00001f;
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {

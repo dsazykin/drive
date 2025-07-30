@@ -18,8 +18,8 @@ public class RoadGenerator {
     private final float SCALE;
     private final long SEED;
 
-    private final float STEP_SIZE = 0.01f;
-    private final float FREQ = 0.6f;
+    private final float STEP_SIZE = 0.001f;
+    private final float FREQ = 0.1f;
 
     public RoadGenerator(int chunkSize, float scale,
                          long seed) {
