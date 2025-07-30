@@ -45,7 +45,7 @@ public class Main extends SimpleApplication
 
     private Vector3f cameraPos = new Vector3f();
 
-    private final int CHUNK_SIZE = 50;
+    private final int CHUNK_SIZE = 100;
     private final float SCALE = 40f;
 
     private final float ROAD_WIDTH = 10f;
@@ -76,7 +76,7 @@ public class Main extends SimpleApplication
                                          CHUNK_SIZE, SCALE, SEED, 100);
         this.manager =
                 new ChunkManager(bulletAppState, rootNode, road, generator, this, executor, CHUNK_SIZE,
-                                 SCALE, 5, 100);
+                                 SCALE, 3, 100);
         generator.setChunkManager(manager);
 
         setUpKeys();
@@ -235,20 +235,20 @@ public class Main extends SimpleApplication
             car.move(velocity, speed);
             car.steer(speed, tpf);
 
-//            Vector3f forward = control.getForwardVector(null).normalizeLocal();
-//
-//            // === SMOOTH CAMERA FOLLOW ===
-//            Vector3f targetCamPos =
-//                    control.getPhysicsLocation().add(forward.negate().mult(-10f)) // 20 units behind
-//                            .add(0, 6f, 0);
-//
-//            // Interpolate camera position
-//            float lerpSpeed = 5f; // higher = faster
-//            cameraPos.interpolateLocal(targetCamPos, lerpSpeed * tpf);
-//            cam.setLocation(cameraPos);
-//
-//            // Look at the player (can be smoothed as well if needed)
-//            cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
+            Vector3f forward = control.getForwardVector(null).normalizeLocal();
+
+            // === SMOOTH CAMERA FOLLOW ===
+            Vector3f targetCamPos =
+                    control.getPhysicsLocation().add(forward.negate().mult(-10f)) // 20 units behind
+                            .add(0, 6f, 0);
+
+            // Interpolate camera position
+            float lerpSpeed = 5f; // higher = faster
+            cameraPos.interpolateLocal(targetCamPos, lerpSpeed * tpf);
+            cam.setLocation(cameraPos);
+
+            // Look at the player (can be smoothed as well if needed)
+            cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
 
             speedText.setText(String.format("Speed: %.1f km/h", speed));
 
@@ -256,8 +256,10 @@ public class Main extends SimpleApplication
             frontRightText.setText(String.format("FR: %.1f", control.getWheel(1).getFrictionSlip()));
             rearLeftText.setText(String.format("RL: %.1f", control.getWheel(2).getFrictionSlip()));
             rearRightText.setText(String.format("RR: %.1f", control.getWheel(3).getFrictionSlip()));
-            chunkX.setText(String.format("X Coord: %.1f", Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 8)))));
-            chunkZ.setText(String.format("Z Coord: %.1f", Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 8)))));
+            chunkX.setText(String.format("X Coord: %.1f",
+                                         Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
+            chunkZ.setText(String.format("Z Coord: %.1f",
+                                         Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
         }
     }
 

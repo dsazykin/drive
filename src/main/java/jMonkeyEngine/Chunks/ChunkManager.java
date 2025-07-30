@@ -51,8 +51,8 @@ public class ChunkManager {
     }
 
     public void updateChunks(Vector3f playerPos) {
-        int playerChunkX = (int) Math.floor(playerPos.x / ((CHUNK_SIZE - 1) * (SCALE / 8)));
-        int playerChunkZ = (int) Math.floor(playerPos.z / ((CHUNK_SIZE - 1) * (SCALE / 8)));
+        int playerChunkX = (int) Math.floor(playerPos.x / ((CHUNK_SIZE - 1) * (SCALE / 16)));
+        int playerChunkZ = (int) Math.floor(playerPos.z / ((CHUNK_SIZE - 1) * (SCALE / 16)));
 
         Set<ChunkCoord> neededChunks = new HashSet<>();
 

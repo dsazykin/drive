@@ -89,11 +89,11 @@ public class HeightMapGenerator {
             }
         }
 
-        File directory = new File("generated_noise");
-        if (!directory.exists()) directory.mkdirs();
-        File outputFile = new File(directory, "noise_chunk_" + chunkX + "_" + chunkZ + ".png");
-        ImageIO.write(image, "png", outputFile);
-        System.out.println("Noise image saved to: " + outputFile.getAbsolutePath());
+//        File directory = new File("generated_noise");
+//        if (!directory.exists()) directory.mkdirs();
+//        File outputFile = new File(directory, "noise_chunk_" + chunkX + "_" + chunkZ + ".png");
+//        ImageIO.write(image, "png", outputFile);
+//        System.out.println("Noise image saved to: " + outputFile.getAbsolutePath());
 
         return heightmap;
     }

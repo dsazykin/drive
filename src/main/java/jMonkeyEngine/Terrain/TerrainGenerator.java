@@ -108,9 +108,9 @@ public class TerrainGenerator{
                 colors[vertexIndex] = color;
 
                 vertices[vertexIndex++] = new Vector3f(
-                        (x * (SCALE / 8)),
+                        (x * (SCALE / 16)),
                         height * MAX_HEIGHT,
-                        (z * (SCALE / 8))
+                        (z * (SCALE / 16))
                 );
 
             }
@@ -151,9 +151,9 @@ public class TerrainGenerator{
         chunkGeom.setMaterial(mat);
 
         chunkGeom.setLocalTranslation(
-                chunk.x * (CHUNK_SIZE - 1f) * (SCALE / 8),
+                chunk.x * (CHUNK_SIZE - 1f) * (SCALE / 16),
                 0,
-                chunk.z * (CHUNK_SIZE - 1f) * (SCALE / 8)
+                chunk.z * (CHUNK_SIZE - 1f) * (SCALE / 16)
         );
 
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
