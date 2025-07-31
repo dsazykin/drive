@@ -189,7 +189,7 @@ public class Main extends SimpleApplication
 
         rearRightText = new BitmapText(guiFont, false);
         rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
-        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0); // top-left corner
+        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0);
         guiGroupNode.attachChild(rearRightText);
 
         chunkX = new BitmapText(guiFont, false);
@@ -211,7 +211,7 @@ public class Main extends SimpleApplication
     private void initPauseMenu() {
         pauseMenuNode = new Node("PauseMenu");
 
-        BitmapText pauseText = new BitmapText(guiFont);
+        pauseText = new BitmapText(guiFont);
         pauseText.setText("Game Paused\nPress ESC to Resume\nPress Q to Quit");
         pauseText.setLocalTranslation((float) cam.getWidth() / 4, (float) cam.getHeight() / 2, 0);
         pauseMenuNode.attachChild(pauseText);

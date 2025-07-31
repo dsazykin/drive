@@ -159,11 +159,15 @@ public class Car {
         float backRightFriction = (3.5f * (rearLoadFactor * rightLoadFactor * 1.1f)) + 0.5f;
 
         // Apply normalized load to base friction
-        control.getWheel(0).setFrictionSlip(FastMath.clamp(frontLeftFriction * speedFactor, 0.5f, 100f));
-        control.getWheel(1).setFrictionSlip(FastMath.clamp(frontRightFriction * speedFactor, 0.5f, 100f));
+        control.getWheel(0).setFrictionSlip(FastMath.clamp(frontLeftFriction * speedFactor, 1f,
+                                                           100f));
+        control.getWheel(1).setFrictionSlip(FastMath.clamp(frontRightFriction * speedFactor, 1f,
+                                                           100f));
 
-        control.getWheel(2).setFrictionSlip(FastMath.clamp(backLeftFriction * speedFactor, 1f, 100f));
-        control.getWheel(3).setFrictionSlip(FastMath.clamp(backRightFriction * speedFactor, 1f, 100f));
+        control.getWheel(2).setFrictionSlip(FastMath.clamp(backLeftFriction * speedFactor, 1.5f,
+                                                           100f));
+        control.getWheel(3).setFrictionSlip(FastMath.clamp(backRightFriction * speedFactor, 1.5f,
+                                                           100f));
     }
 
     public void move(float velocity, float speed) {
