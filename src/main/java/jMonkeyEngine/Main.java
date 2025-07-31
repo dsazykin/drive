@@ -9,9 +9,7 @@ import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.KeyTrigger;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
-import com.jme3.math.ColorRGBA;
-import com.jme3.math.FastMath;
-import com.jme3.math.Vector3f;
+import com.jme3.math.*;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Entities.Car;
 import jMonkeyEngine.Road.RoadGenerator;
@@ -31,6 +29,7 @@ public class Main extends SimpleApplication
     RoadGenerator road;
 
     private Car car;
+    private float spawnHeight;
 
     private BitmapText speedText;
     private BitmapText frontLeftText;
@@ -44,11 +43,10 @@ public class Main extends SimpleApplication
     private boolean loadingDone = false;
 
     private Vector3f cameraPos = new Vector3f();
+    private boolean followCam = true;
 
     private final int CHUNK_SIZE = 100;
     private final float SCALE = 40f;
-
-    private final float ROAD_WIDTH = 10f;
     private long SEED;
 
     public static void main(String[] args) {
@@ -79,11 +77,12 @@ public class Main extends SimpleApplication
                                  SCALE, 3, 200);
         generator.setChunkManager(manager);
 
+        spawnHeight = generator.getSpawnHeight() + 0.1f;
+
         setUpKeys();
         setUpLight();
         loadScene();
         initCar();
-
         loadGUI();
     }
 
@@ -151,14 +150,17 @@ public class Main extends SimpleApplication
     private void initCar() {
         car = new Car(assetManager, bulletAppState.getPhysicsSpace());
         // Set desired spawn location
-        float spawnHeight = generator.getSpawnHeight();
-        Vector3f spawnPosition = new Vector3f(5f, spawnHeight + 2, 2f);
+        Vector3f spawnPosition = new Vector3f(5f, spawnHeight, 2f);
+        Quaternion rotation = new Quaternion();
+        rotation.fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y);
 
         // Apply to the physics control (VehicleControl or similar)
         car.getControl().setPhysicsLocation(spawnPosition);
+        car.getControl().setPhysicsRotation(rotation);
 
         // Optionally also apply to the visual node (if needed)
         car.getCarNode().setLocalTranslation(spawnPosition);
+        car.getCarNode().rotate(rotation);
 
         rootNode.attachChild(car.getCarNode());
     }
@@ -176,14 +178,18 @@ public class Main extends SimpleApplication
     }
 
     private void setUpKeys() {
-        inputManager.addMapping("Left", new KeyTrigger(KeyInput.KEY_LEFT));
-        inputManager.addMapping("Right", new KeyTrigger(KeyInput.KEY_RIGHT));
-        inputManager.addMapping("Up", new KeyTrigger(KeyInput.KEY_UP));
-        inputManager.addMapping("Down", new KeyTrigger(KeyInput.KEY_DOWN));
+        inputManager.addMapping("Left", new KeyTrigger(KeyInput.KEY_A));
+        inputManager.addMapping("Right", new KeyTrigger(KeyInput.KEY_D));
+        inputManager.addMapping("Accelerate", new KeyTrigger(KeyInput.KEY_W));
+        inputManager.addMapping("Break", new KeyTrigger(KeyInput.KEY_S));
+        inputManager.addMapping("Cam", new KeyTrigger(KeyInput.KEY_C));
+        inputManager.addMapping("Reset", new KeyTrigger(KeyInput.KEY_R));
         inputManager.addListener(this, "Left");
         inputManager.addListener(this, "Right");
-        inputManager.addListener(this, "Up");
-        inputManager.addListener(this, "Down");
+        inputManager.addListener(this, "Accelerate");
+        inputManager.addListener(this, "Break");
+        inputManager.addListener(this, "Cam");
+        inputManager.addListener(this, "Reset");
     }
 
     private void enablePlayerControls(boolean enabled) {
@@ -205,10 +211,23 @@ public class Main extends SimpleApplication
             } else {
                 car.setTargetSteeringValue(0f);
             }
-        } else if (binding.equals("Up")) {
+        } else if (binding.equals("Accelerate")) {
             car.setAccelerating(value);
-        } else if (binding.equals("Down")) {
+        } else if (binding.equals("Break")) {
             car.setBreaking(value);
+        }
+
+        if (binding.equals("Cam") && !value) {
+            followCam = !followCam;
+        }
+
+        if (binding.equals("Reset") && !value) {
+            VehicleControl control = car.getControl();
+            control.setLinearVelocity(new Vector3f(0,0,0));
+            control.setAngularVelocity(new Vector3f(0,0,0));
+            Vector3f resetPosition = new Vector3f(5f, spawnHeight, 2f);
+            car.getControl().setPhysicsLocation(resetPosition);
+            car.getCarNode().setLocalTranslation(resetPosition);
         }
     }
 
@@ -225,8 +244,8 @@ public class Main extends SimpleApplication
                 });
             }
         } else {
-            manager.updateChunks(cam.getLocation());
             VehicleControl control = car.getControl();
+            manager.updateChunks(cam.getLocation());
 
             // 1. Get current speed
             float speed = -control.getCurrentVehicleSpeedKmHour();
@@ -236,7 +255,9 @@ public class Main extends SimpleApplication
             car.move(velocity, speed);
             car.steer(speed, tpf);
 
-            followCam(tpf, control);
+            if (followCam) {
+                followCam(tpf, control);
+            }
 
             UpdateGUI(speed, control);
         }
