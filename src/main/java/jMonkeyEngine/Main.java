@@ -44,10 +44,12 @@ public class Main extends SimpleApplication
     private BitmapText loadingText;
     private BitmapText chunkX;
     private BitmapText chunkZ;
+    private BitmapText pauseText;
 
     private boolean loadingDone = false;
     private boolean isPaused = false;
     private Node pauseMenuNode;
+    private boolean guiLoaded = false;
 
     private Vector3f cameraPos = new Vector3f();
     private boolean followCam = true;
@@ -105,6 +107,14 @@ public class Main extends SimpleApplication
         initPauseMenu();
     }
 
+    @Override
+    public void reshape(int w, int h) {
+        super.reshape(w, h);
+        if (guiLoaded) {
+            reloadGUI();
+        }
+    }
+
     private void loadGUI() {
         guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
 
@@ -148,6 +158,54 @@ public class Main extends SimpleApplication
         chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
         chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
         guiGroupNode.attachChild(chunkZ);
+
+        guiLoaded = true;
+    }
+
+    private void reloadGUI() {
+        guiGroupNode.detachAllChildren();
+        pauseMenuNode.detachAllChildren();
+        guiNode.detachChild(speedText);
+
+        speedText = new BitmapText(guiFont, false);
+        speedText.setSize(guiFont.getCharSet().getRenderedSize());
+        speedText.setLocalTranslation(10, cam.getHeight() - 10, 0);
+        guiNode.attachChild(speedText);
+
+        frontLeftText = new BitmapText(guiFont, false);
+        frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
+        frontLeftText.setLocalTranslation(10, cam.getHeight() - 50, 0);
+        guiGroupNode.attachChild(frontLeftText);
+
+        frontRightText = new BitmapText(guiFont, false);
+        frontRightText.setSize(guiFont.getCharSet().getRenderedSize());
+        frontRightText.setLocalTranslation(130, cam.getHeight() - 50, 0);
+        guiGroupNode.attachChild(frontRightText);
+
+        rearLeftText = new BitmapText(guiFont, false);
+        rearLeftText.setSize(guiFont.getCharSet().getRenderedSize());
+        rearLeftText.setLocalTranslation(10, cam.getHeight() - 70, 0);
+        guiGroupNode.attachChild(rearLeftText);
+
+        rearRightText = new BitmapText(guiFont, false);
+        rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
+        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0); // top-left corner
+        guiGroupNode.attachChild(rearRightText);
+
+        chunkX = new BitmapText(guiFont, false);
+        chunkX.setSize(guiFont.getCharSet().getRenderedSize());
+        chunkX.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 10, 0);
+        guiGroupNode.attachChild(chunkX);
+
+        chunkZ = new BitmapText(guiFont, false);
+        chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
+        chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
+        guiGroupNode.attachChild(chunkZ);
+
+        pauseText = new BitmapText(guiFont);
+        pauseText.setText("Game Paused\nPress ESC to Resume\nPress Q to Quit");
+        pauseText.setLocalTranslation((float) cam.getWidth() / 4, (float) cam.getHeight() / 2, 0);
+        pauseMenuNode.attachChild(pauseText);
     }
 
     private void initPauseMenu() {
@@ -155,13 +213,12 @@ public class Main extends SimpleApplication
 
         BitmapText pauseText = new BitmapText(guiFont);
         pauseText.setText("Game Paused\nPress ESC to Resume\nPress Q to Quit");
-        pauseText.setLocalTranslation(300, 400, 0); // Adjust position
+        pauseText.setLocalTranslation((float) cam.getWidth() / 4, (float) cam.getHeight() / 2, 0);
         pauseMenuNode.attachChild(pauseText);
 
         guiNode.attachChild(pauseMenuNode);
-        pauseMenuNode.setCullHint(Spatial.CullHint.Always); // Hide initially
+        pauseMenuNode.setCullHint(Spatial.CullHint.Always);
     }
-
 
     private void loadScene() {
         generator.CreateTerrain();
