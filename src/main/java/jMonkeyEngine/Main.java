@@ -256,7 +256,10 @@ public class Main extends SimpleApplication
             control.setAngularVelocity(new Vector3f(0,0,0));
             Vector3f resetPosition = new Vector3f(5f, spawnHeight, 5f);
             car.getControl().setPhysicsLocation(resetPosition);
+            car.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
+
             car.getCarNode().setLocalTranslation(resetPosition);
+            car.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
         }
 
         if (binding.equals("GUI") && !value) {
