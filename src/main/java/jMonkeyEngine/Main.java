@@ -11,6 +11,7 @@ import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.math.*;
 import com.jme3.scene.Node;
+import com.jme3.system.AppSettings;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Entities.Car;
 import jMonkeyEngine.Road.RoadGenerator;
@@ -54,6 +55,14 @@ public class Main extends SimpleApplication
 
     public static void main(String[] args) {
         Main app = new Main();
+
+        AppSettings settings = new AppSettings(true);
+        settings.setTitle("My Game");
+        settings.setResolution(1280, 720);
+        settings.setResizable(true);
+
+        app.setSettings(settings);
+        app.setShowSettings(false);
         app.start();
     }
 
@@ -80,7 +89,7 @@ public class Main extends SimpleApplication
                                  SCALE, 3, 200);
         generator.setChunkManager(manager);
 
-        spawnHeight = generator.getSpawnHeight() + 0.1f;
+        spawnHeight = generator.getSpawnHeight() + 0.5f;
 
         guiGroupNode = new Node("guiGroupNode");
 
