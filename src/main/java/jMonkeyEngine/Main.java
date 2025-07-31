@@ -73,10 +73,10 @@ public class Main extends SimpleApplication
 
         road = new RoadGenerator(CHUNK_SIZE, SCALE, SEED);
         generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, road, this, executor,
-                                         CHUNK_SIZE, SCALE, SEED, 100);
+                                         CHUNK_SIZE, SCALE, SEED, 200);
         this.manager =
                 new ChunkManager(bulletAppState, rootNode, road, generator, this, executor, CHUNK_SIZE,
-                                 SCALE, 3, 100);
+                                 SCALE, 3, 200);
         generator.setChunkManager(manager);
 
         setUpKeys();
@@ -151,7 +151,8 @@ public class Main extends SimpleApplication
     private void initCar() {
         car = new Car(assetManager, bulletAppState.getPhysicsSpace());
         // Set desired spawn location
-        Vector3f spawnPosition = new Vector3f(2f, 50f, -2f); // <-- change this
+        float spawnHeight = generator.getSpawnHeight();
+        Vector3f spawnPosition = new Vector3f(5f, spawnHeight + 2, 2f);
 
         // Apply to the physics control (VehicleControl or similar)
         car.getControl().setPhysicsLocation(spawnPosition);
@@ -165,7 +166,7 @@ public class Main extends SimpleApplication
     private void setUpLight() {
         // We add light so we see the scene
         AmbientLight al = new AmbientLight();
-        al.setColor(ColorRGBA.White.mult(1.3f));
+        al.setColor(ColorRGBA.White.mult(0.5f));
         rootNode.addLight(al);
 
         DirectionalLight dl = new DirectionalLight();
@@ -235,32 +236,40 @@ public class Main extends SimpleApplication
             car.move(velocity, speed);
             car.steer(speed, tpf);
 
-            Vector3f forward = control.getForwardVector(null).normalizeLocal();
+            followCam(tpf, control);
 
-            // === SMOOTH CAMERA FOLLOW ===
-            Vector3f targetCamPos =
-                    control.getPhysicsLocation().add(forward.negate().mult(-10f)) // 20 units behind
-                            .add(0, 6f, 0);
-
-            // Interpolate camera position
-            float lerpSpeed = 5f; // higher = faster
-            cameraPos.interpolateLocal(targetCamPos, lerpSpeed * tpf);
-            cam.setLocation(cameraPos);
-
-            // Look at the player (can be smoothed as well if needed)
-            cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
-
-            speedText.setText(String.format("Speed: %.1f km/h", speed));
-
-            frontLeftText.setText(String.format("FL: %.1f", control.getWheel(0).getFrictionSlip()));
-            frontRightText.setText(String.format("FR: %.1f", control.getWheel(1).getFrictionSlip()));
-            rearLeftText.setText(String.format("RL: %.1f", control.getWheel(2).getFrictionSlip()));
-            rearRightText.setText(String.format("RR: %.1f", control.getWheel(3).getFrictionSlip()));
-            chunkX.setText(String.format("X Coord: %.1f",
-                                         Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
-            chunkZ.setText(String.format("Z Coord: %.1f",
-                                         Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
+            UpdateGUI(speed, control);
         }
+    }
+
+    private void followCam(float tpf, VehicleControl control) {
+        Vector3f forward = control.getForwardVector(null).normalizeLocal();
+
+        // === SMOOTH CAMERA FOLLOW ===
+        Vector3f targetCamPos =
+                control.getPhysicsLocation().add(forward.negate().mult(-10f)) // 20 units behind
+                        .add(0, 6f, 0);
+
+        // Interpolate camera position
+        float lerpSpeed = 5f; // higher = faster
+        cameraPos.interpolateLocal(targetCamPos, lerpSpeed * tpf);
+        cam.setLocation(cameraPos);
+
+        // Look at the player (can be smoothed as well if needed)
+        cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
+    }
+
+    private void UpdateGUI(float speed, VehicleControl control) {
+        speedText.setText(String.format("Speed: %.1f km/h", speed));
+
+        frontLeftText.setText(String.format("FL: %.1f", control.getWheel(0).getFrictionSlip()));
+        frontRightText.setText(String.format("FR: %.1f", control.getWheel(1).getFrictionSlip()));
+        rearLeftText.setText(String.format("RL: %.1f", control.getWheel(2).getFrictionSlip()));
+        rearRightText.setText(String.format("RR: %.1f", control.getWheel(3).getFrictionSlip()));
+        chunkX.setText(String.format("X Coord: %.1f",
+                                     Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
+        chunkZ.setText(String.format("Z Coord: %.1f",
+                                     Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
     }
 
     @Override

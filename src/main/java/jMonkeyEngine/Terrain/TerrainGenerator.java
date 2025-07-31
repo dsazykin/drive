@@ -13,10 +13,16 @@ import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import com.jme3.scene.VertexBuffer;
+import com.jme3.texture.Image;
+import com.jme3.texture.Texture2D;
+import com.jme3.texture.plugins.AWTLoader;
 import com.jme3.util.BufferUtils;
+import com.jme3.util.TangentBinormalGenerator;
 import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Road.RoadGenerator;
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -137,17 +143,63 @@ public class TerrainGenerator{
             }
         }
 
+        Vector2f[] uvs = new Vector2f[CHUNK_SIZE * CHUNK_SIZE];
+        int index = 0;
+        for (int z = 0; z < CHUNK_SIZE; z++) {
+            for (int x = 0; x < CHUNK_SIZE; x++) {
+                uvs[index++] = new Vector2f((float)x / (CHUNK_SIZE - 1), (float)z / (CHUNK_SIZE - 1));
+            }
+        }
+
+        mesh.setBuffer(VertexBuffer.Type.TexCoord, 2, BufferUtils.createFloatBuffer(uvs));
+
+        Vector3f[] normals = computeNormals(vertices, indices);
+        mesh.setBuffer(VertexBuffer.Type.Normal, 3, BufferUtils.createFloatBuffer(normals));
+
         mesh.setBuffer(VertexBuffer.Type.Position, 3, BufferUtils.createFloatBuffer(vertices));
         mesh.setBuffer(VertexBuffer.Type.Index, 3, BufferUtils.createIntBuffer(indices));
         mesh.setBuffer(VertexBuffer.Type.Color, 4, BufferUtils.createFloatBuffer(colors));
         mesh.updateBound();
+
         return mesh;
     }
 
-    public Geometry createGeometry(ChunkCoord chunk, Mesh mesh) {
+    private Vector3f[] computeNormals(Vector3f[] vertices, int[] indices) {
+        Vector3f[] normals = new Vector3f[vertices.length];
+        for (int i = 0; i < normals.length; i++) {
+            normals[i] = new Vector3f(0, 0, 0);
+        }
+
+        for (int i = 0; i < indices.length; i += 3) {
+            int i0 = indices[i];
+            int i1 = indices[i + 1];
+            int i2 = indices[i + 2];
+
+            Vector3f v0 = vertices[i0];
+            Vector3f v1 = vertices[i1];
+            Vector3f v2 = vertices[i2];
+
+            Vector3f edge1 = v1.subtract(v0);
+            Vector3f edge2 = v2.subtract(v0);
+            Vector3f normal = edge1.cross(edge2).normalizeLocal();
+
+            normals[i0].addLocal(normal);
+            normals[i1].addLocal(normal);
+            normals[i2].addLocal(normal);
+        }
+
+        for (Vector3f n : normals) {
+            n.normalizeLocal();
+        }
+
+        return normals;
+    }
+
+    public Geometry createGeometry(ChunkCoord chunk, Mesh mesh, float[][] heightmap) {
         Geometry chunkGeom = new Geometry("Chunk_" + chunk.x + "_" + chunk.z, mesh);
-        Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
-        mat.setBoolean("VertexColor", true);
+        Material mat = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
+        mat.setBoolean("UseVertexColor", true);
+
         chunkGeom.setMaterial(mat);
 
         chunkGeom.setLocalTranslation(
@@ -159,6 +211,10 @@ public class TerrainGenerator{
         MeshCollisionShape terrainShape = new MeshCollisionShape(mesh);
         RigidBodyControl chunkPhysics = new RigidBodyControl(terrainShape, 0);
         chunkGeom.addControl(chunkPhysics);
+
+        mesh.updateBound();
+        mesh.updateCounts();
+        TangentBinormalGenerator.generate(mesh);
 
         return chunkGeom;
     }
@@ -173,7 +229,7 @@ public class TerrainGenerator{
                 List<Vector2f> pathPoints = generator.getRoadPointsInChunk(chunk.x, chunk.z);
                 float[][] terrain = generateHeightMap(CHUNK_SIZE, SCALE, chunk, pathPoints);
                 Mesh mesh = generateChunkMesh(terrain);
-                Geometry chunkGeom = createGeometry(chunk, mesh);
+                Geometry chunkGeom = createGeometry(chunk, mesh, terrain);
 
                 main.enqueue(() -> {
                     manager.addChunk(chunk, chunkGeom);
@@ -192,5 +248,16 @@ public class TerrainGenerator{
 
     public List<Future<?>> getChunkTasks() {
         return chunkTasks;
+    }
+
+    public float getSpawnHeight() {
+        float[][] spawnChunk = null;
+        try {
+            spawnChunk =
+                    generateHeightMap(CHUNK_SIZE, SCALE, new ChunkCoord(0, 0), new ArrayList<>());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return spawnChunk[0][0] * MAX_HEIGHT;
     }
 }

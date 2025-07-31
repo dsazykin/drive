@@ -7,6 +7,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
 
@@ -20,8 +21,8 @@ public class HeightMapGenerator {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 
         // === Trace the road path once globally ===
-        float roadWidth = 0.15f;
-        float flattenStrength = 0.00001f;
+        float roadWidth = 0.25f;
+        float flattenStrength = 0.01f;
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
@@ -29,11 +30,13 @@ public class HeightMapGenerator {
                 double worldY = (chunkZ * (height - 1) + y) / scale;
 
                 // === Terrain noise ===
-                float e = 100f * OpenSimplex2.noise2(seed, 0.07f * worldX, 0.07f * worldY) +
-                        4f * OpenSimplex2.noise2(seed, 0.25f * worldX, 0.25f * worldY) +
+                float e = 40f * OpenSimplex2.noise2(seed, 0.05f * worldX, 0.05f * worldY) +
+                        6f * OpenSimplex2.noise2(seed, 0.25f * worldX, 0.25f * worldY) +
+                        0.9f * OpenSimplex2.noise2(seed, 0.5f * worldX, 0.5f * worldY) +
                         0.6f * OpenSimplex2.noise2(seed, 0.75f * worldX, 0.75f * worldY);
-                e = e / (100f + 4f + 0.6f);
+                e = e / (40f + 6f + 0.9f + 0.6f);
                 e = (e + 1f) / 2f;
+                e = FastMath.pow(e, 0.75f);
                 float terrainHeight = e;
 
                 // === Road flattening ===
@@ -89,27 +92,31 @@ public class HeightMapGenerator {
             }
         }
 
-//        File directory = new File("generated_noise");
-//        if (!directory.exists()) directory.mkdirs();
-//        File outputFile = new File(directory, "noise_chunk_" + chunkX + "_" + chunkZ + ".png");
-//        ImageIO.write(image, "png", outputFile);
-//        System.out.println("Noise image saved to: " + outputFile.getAbsolutePath());
+        //generateImage(chunkX, chunkZ, image);
 
         return heightmap;
     }
 
+    private static void generateImage(int chunkX, int chunkZ, BufferedImage image) throws IOException {
+        File directory = new File("generated_noise");
+        if (!directory.exists()) directory.mkdirs();
+        File outputFile = new File(directory, "noise_chunk_" + chunkX + "_" + chunkZ + ".png");
+        ImageIO.write(image, "png", outputFile);
+        System.out.println("Noise image saved to: " + outputFile.getAbsolutePath());
+    }
+
     public static void main(String[] args) throws IOException {
         HeightMapGenerator generator = new HeightMapGenerator();
-        RoadGenerator road = new RoadGenerator(500, 40, seed);
-        float[][] heightmap;
+        RoadGenerator road = new RoadGenerator(1000, 40, seed);
 
-        //heightmap = generator.generateHeightmap(500, 500, seed, 40, 0, 0);
+        //List<Vector2f> pathPoints = road.getRoadPointsInChunk(0, 0);
+        float[][] heightmap = generator.generateHeightmap(1000, 1000, seed, 40, 0, 0, new ArrayList<>());
 
-        for (int x = -1; x < 2; x++) {
-            for (int z = -1; z < 2; z++) {
-                List<Vector2f> pathPoints = road.getRoadPointsInChunk(x, z);
-                heightmap = generator.generateHeightmap(500, 500, seed, 40, x, z, pathPoints);
-            }
-        }
+//        for (int x = -1; x < 2; x++) {
+//            for (int z = -1; z < 2; z++) {
+//                List<Vector2f> pathPoints = road.getRoadPointsInChunk(x, z);
+//                heightmap = generator.generateHeightmap(500, 500, seed, 40, x, z, pathPoints);
+//            }
+//        }
     }
 }

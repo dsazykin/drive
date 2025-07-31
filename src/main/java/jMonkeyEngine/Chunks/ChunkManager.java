@@ -73,8 +73,7 @@ public class ChunkManager {
                                                                             chunk, pathPoints);
 
                             Mesh mesh = generator.generateChunkMesh(terrain);
-                            Geometry chunkGeom = generator.createGeometry(chunk, mesh);
-
+                            Geometry chunkGeom = generator.createGeometry(chunk, mesh, terrain);
 
                             main.enqueue(() -> {
                                 loadedChunks.put(chunk, chunkGeom);
