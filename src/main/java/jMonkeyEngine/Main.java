@@ -272,8 +272,9 @@ public class Main extends SimpleApplication
                 followCam(tpf, control);
             }
 
+            speedText.setText(String.format("Speed: %.1f km/h", speed));
             if (gui) {
-                updateGUI(speed, control);
+                updateGUI(control);
             }
         }
     }
@@ -295,9 +296,7 @@ public class Main extends SimpleApplication
         cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
     }
 
-    private void updateGUI(float speed, VehicleControl control) {
-        speedText.setText(String.format("Speed: %.1f km/h", speed));
-
+    private void updateGUI(VehicleControl control) {
         frontLeftText.setText(String.format("FL: %.1f", control.getWheel(0).getFrictionSlip()));
         frontRightText.setText(String.format("FR: %.1f", control.getWheel(1).getFrictionSlip()));
         rearLeftText.setText(String.format("RL: %.1f", control.getWheel(2).getFrictionSlip()));
