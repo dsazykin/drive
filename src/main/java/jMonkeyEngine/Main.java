@@ -92,17 +92,18 @@ public class Main extends SimpleApplication
     }
 
     private void loadGUI() {
+        guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
+
         loadingText = new BitmapText(guiFont, false);
         loadingText.setSize(guiFont.getCharSet().getRenderedSize());
         loadingText.setText("Loading terrain...");
         loadingText.setLocalTranslation(300, 300, 0);
         guiNode.attachChild(loadingText);
 
-        guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
         speedText = new BitmapText(guiFont, false);
         speedText.setSize(guiFont.getCharSet().getRenderedSize());
         speedText.setLocalTranslation(10, cam.getHeight() - 10, 0);
-        guiGroupNode.attachChild(speedText);
+        guiNode.attachChild(speedText);
 
         frontLeftText = new BitmapText(guiFont, false);
         frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
