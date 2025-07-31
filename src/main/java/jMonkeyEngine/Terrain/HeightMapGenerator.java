@@ -22,7 +22,7 @@ public class HeightMapGenerator {
 
         // === Trace the road path once globally ===
         float roadWidth = 0.25f;
-        float flattenStrength = 0.01f;
+        float flattenStrength = 0.0000001f;
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {

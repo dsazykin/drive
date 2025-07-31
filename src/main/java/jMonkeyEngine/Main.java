@@ -3,6 +3,7 @@ package jMonkeyEngine;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.VehicleControl;
+import com.jme3.font.BitmapFont;
 import com.jme3.font.BitmapText;
 import com.jme3.input.KeyInput;
 import com.jme3.input.controls.ActionListener;
@@ -11,6 +12,7 @@ import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.math.*;
 import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
 import com.jme3.system.AppSettings;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Entities.Car;
@@ -44,6 +46,8 @@ public class Main extends SimpleApplication
     private BitmapText chunkZ;
 
     private boolean loadingDone = false;
+    private boolean isPaused = false;
+    private Node pauseMenuNode;
 
     private Vector3f cameraPos = new Vector3f();
     private boolean followCam = true;
@@ -98,6 +102,7 @@ public class Main extends SimpleApplication
         loadScene();
         initCar();
         loadGUI();
+        initPauseMenu();
     }
 
     private void loadGUI() {
@@ -145,6 +150,19 @@ public class Main extends SimpleApplication
         guiGroupNode.attachChild(chunkZ);
     }
 
+    private void initPauseMenu() {
+        pauseMenuNode = new Node("PauseMenu");
+
+        BitmapText pauseText = new BitmapText(guiFont);
+        pauseText.setText("Game Paused\nPress ESC to Resume\nPress Q to Quit");
+        pauseText.setLocalTranslation(300, 400, 0); // Adjust position
+        pauseMenuNode.attachChild(pauseText);
+
+        guiNode.attachChild(pauseMenuNode);
+        pauseMenuNode.setCullHint(Spatial.CullHint.Always); // Hide initially
+    }
+
+
     private void loadScene() {
         generator.CreateTerrain();
     }
@@ -152,7 +170,7 @@ public class Main extends SimpleApplication
     private void initCar() {
         car = new Car(assetManager, bulletAppState.getPhysicsSpace());
         // Set desired spawn location
-        Vector3f spawnPosition = new Vector3f(5f, spawnHeight, 2f);
+        Vector3f spawnPosition = new Vector3f(5f, spawnHeight, 5f);
         Quaternion rotation = new Quaternion();
         rotation.fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y);
 
@@ -180,6 +198,8 @@ public class Main extends SimpleApplication
     }
 
     private void setUpKeys() {
+        inputManager.deleteMapping(SimpleApplication.INPUT_MAPPING_EXIT);
+
         inputManager.addMapping("Left", new KeyTrigger(KeyInput.KEY_A));
         inputManager.addMapping("Right", new KeyTrigger(KeyInput.KEY_D));
         inputManager.addMapping("Accelerate", new KeyTrigger(KeyInput.KEY_W));
@@ -187,6 +207,9 @@ public class Main extends SimpleApplication
         inputManager.addMapping("Cam", new KeyTrigger(KeyInput.KEY_C));
         inputManager.addMapping("Reset", new KeyTrigger(KeyInput.KEY_R));
         inputManager.addMapping("GUI", new KeyTrigger(KeyInput.KEY_G));
+        inputManager.addMapping("Pause", new KeyTrigger(KeyInput.KEY_ESCAPE));
+        inputManager.addMapping("Quit", new KeyTrigger(KeyInput.KEY_Q));
+
         inputManager.addListener(this, "Left");
         inputManager.addListener(this, "Right");
         inputManager.addListener(this, "Accelerate");
@@ -194,6 +217,8 @@ public class Main extends SimpleApplication
         inputManager.addListener(this, "Cam");
         inputManager.addListener(this, "Reset");
         inputManager.addListener(this, "GUI");
+        inputManager.addListener(this, "Pause");
+        inputManager.addListener(this, "Quit");
     }
 
     private void enablePlayerControls(boolean enabled) {
@@ -229,7 +254,7 @@ public class Main extends SimpleApplication
             VehicleControl control = car.getControl();
             control.setLinearVelocity(new Vector3f(0,0,0));
             control.setAngularVelocity(new Vector3f(0,0,0));
-            Vector3f resetPosition = new Vector3f(5f, spawnHeight, 2f);
+            Vector3f resetPosition = new Vector3f(5f, spawnHeight, 5f);
             car.getControl().setPhysicsLocation(resetPosition);
             car.getCarNode().setLocalTranslation(resetPosition);
         }
@@ -241,6 +266,31 @@ public class Main extends SimpleApplication
             } else {
                 guiNode.detachChild(guiGroupNode);
             }
+        }
+
+        if (binding.equals("Pause") && !value) {
+           togglePause();
+        }
+
+        if (binding.equals("Quit") && !value && isPaused) {
+           stop();
+        }
+    }
+
+    private void togglePause() {
+        isPaused = !isPaused;
+
+        if (isPaused) {
+            pauseMenuNode.setCullHint(Spatial.CullHint.Never); // Show menu
+            inputManager.setCursorVisible(true);
+            flyCam.setEnabled(false);
+            bulletAppState.setEnabled(false); // Pause physics
+            // Pause your own game logic here too
+        } else {
+            pauseMenuNode.setCullHint(Spatial.CullHint.Always); // Hide menu
+            inputManager.setCursorVisible(false);
+            flyCam.setEnabled(true);
+            bulletAppState.setEnabled(true); // Resume physics
         }
     }
 
