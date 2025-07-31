@@ -10,6 +10,7 @@ import com.jme3.input.controls.KeyTrigger;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.math.*;
+import com.jme3.scene.Node;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Entities.Car;
 import jMonkeyEngine.Road.RoadGenerator;
@@ -31,6 +32,7 @@ public class Main extends SimpleApplication
     private Car car;
     private float spawnHeight;
 
+    private Node guiGroupNode;
     private BitmapText speedText;
     private BitmapText frontLeftText;
     private BitmapText frontRightText;
@@ -44,6 +46,7 @@ public class Main extends SimpleApplication
 
     private Vector3f cameraPos = new Vector3f();
     private boolean followCam = true;
+    private boolean gui = false;
 
     private final int CHUNK_SIZE = 100;
     private final float SCALE = 40f;
@@ -79,6 +82,8 @@ public class Main extends SimpleApplication
 
         spawnHeight = generator.getSpawnHeight() + 0.1f;
 
+        guiGroupNode = new Node("guiGroupNode");
+
         setUpKeys();
         setUpLight();
         loadScene();
@@ -87,63 +92,50 @@ public class Main extends SimpleApplication
     }
 
     private void loadGUI() {
-        guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
-        speedText = new BitmapText(guiFont, false);
-        speedText.setSize(guiFont.getCharSet().getRenderedSize());
-        speedText.setLocalTranslation(10, cam.getHeight() - 10, 0);
-        guiNode.attachChild(speedText);
-
-        frontLeftText = new BitmapText(guiFont, false);
-        frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
-        frontLeftText.setLocalTranslation(10, cam.getHeight() - 50, 0);
-        guiNode.attachChild(frontLeftText);
-
-        frontRightText = new BitmapText(guiFont, false);
-        frontRightText.setSize(guiFont.getCharSet().getRenderedSize());
-        frontRightText.setLocalTranslation(130, cam.getHeight() - 50, 0);
-        guiNode.attachChild(frontRightText);
-
-        rearLeftText = new BitmapText(guiFont, false);
-        rearLeftText.setSize(guiFont.getCharSet().getRenderedSize());
-        rearLeftText.setLocalTranslation(10, cam.getHeight() - 70, 0);
-        guiNode.attachChild(rearLeftText);
-
-        rearRightText = new BitmapText(guiFont, false);
-        rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
-        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0); // top-left corner
-        guiNode.attachChild(rearRightText);
-
         loadingText = new BitmapText(guiFont, false);
         loadingText.setSize(guiFont.getCharSet().getRenderedSize());
         loadingText.setText("Loading terrain...");
         loadingText.setLocalTranslation(300, 300, 0);
         guiNode.attachChild(loadingText);
 
+        guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
+        speedText = new BitmapText(guiFont, false);
+        speedText.setSize(guiFont.getCharSet().getRenderedSize());
+        speedText.setLocalTranslation(10, cam.getHeight() - 10, 0);
+        guiGroupNode.attachChild(speedText);
+
+        frontLeftText = new BitmapText(guiFont, false);
+        frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
+        frontLeftText.setLocalTranslation(10, cam.getHeight() - 50, 0);
+        guiGroupNode.attachChild(frontLeftText);
+
+        frontRightText = new BitmapText(guiFont, false);
+        frontRightText.setSize(guiFont.getCharSet().getRenderedSize());
+        frontRightText.setLocalTranslation(130, cam.getHeight() - 50, 0);
+        guiGroupNode.attachChild(frontRightText);
+
+        rearLeftText = new BitmapText(guiFont, false);
+        rearLeftText.setSize(guiFont.getCharSet().getRenderedSize());
+        rearLeftText.setLocalTranslation(10, cam.getHeight() - 70, 0);
+        guiGroupNode.attachChild(rearLeftText);
+
+        rearRightText = new BitmapText(guiFont, false);
+        rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
+        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0); // top-left corner
+        guiGroupNode.attachChild(rearRightText);
+
         chunkX = new BitmapText(guiFont, false);
         chunkX.setSize(guiFont.getCharSet().getRenderedSize());
-        chunkX.setLocalTranslation(10, cam.getHeight() - 10, 0);
-        guiNode.attachChild(chunkX);
+        chunkX.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 10, 0);
+        guiGroupNode.attachChild(chunkX);
 
         chunkZ = new BitmapText(guiFont, false);
         chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
-        chunkZ.setLocalTranslation(10, cam.getHeight() - 50, 0);
-        guiNode.attachChild(chunkZ);
+        chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
+        guiGroupNode.attachChild(chunkZ);
     }
 
     private void loadScene() {
-//        assetManager.registerLocator(
-//                "https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/jmonkeyengine/town.zip",
-//                HttpZipLocator.class);
-//
-//        Spatial sceneModel = assetManager.loadModel("main.scene");
-//        sceneModel.setLocalScale(4f);
-//
-//        CollisionShape sceneShape = CollisionShapeFactory.createMeshShape(sceneModel);
-//        sceneModel.addControl(new com.jme3.bullet.control.RigidBodyControl(sceneShape, 0));
-//        bulletAppState.getPhysicsSpace()
-//                .add(sceneModel.getControl(com.jme3.bullet.control.RigidBodyControl.class));
-//        rootNode.attachChild(sceneModel);
-
         generator.CreateTerrain();
     }
 
@@ -184,12 +176,14 @@ public class Main extends SimpleApplication
         inputManager.addMapping("Break", new KeyTrigger(KeyInput.KEY_S));
         inputManager.addMapping("Cam", new KeyTrigger(KeyInput.KEY_C));
         inputManager.addMapping("Reset", new KeyTrigger(KeyInput.KEY_R));
+        inputManager.addMapping("GUI", new KeyTrigger(KeyInput.KEY_G));
         inputManager.addListener(this, "Left");
         inputManager.addListener(this, "Right");
         inputManager.addListener(this, "Accelerate");
         inputManager.addListener(this, "Break");
         inputManager.addListener(this, "Cam");
         inputManager.addListener(this, "Reset");
+        inputManager.addListener(this, "GUI");
     }
 
     private void enablePlayerControls(boolean enabled) {
@@ -229,6 +223,15 @@ public class Main extends SimpleApplication
             car.getControl().setPhysicsLocation(resetPosition);
             car.getCarNode().setLocalTranslation(resetPosition);
         }
+
+        if (binding.equals("GUI") && !value) {
+            gui = !gui;
+            if (gui) {
+                guiNode.attachChild(guiGroupNode);
+            } else {
+                guiNode.detachChild(guiGroupNode);
+            }
+        }
     }
 
     @Override
@@ -259,7 +262,9 @@ public class Main extends SimpleApplication
                 followCam(tpf, control);
             }
 
-            UpdateGUI(speed, control);
+            if (gui) {
+                updateGUI(speed, control);
+            }
         }
     }
 
@@ -269,7 +274,7 @@ public class Main extends SimpleApplication
         // === SMOOTH CAMERA FOLLOW ===
         Vector3f targetCamPos =
                 control.getPhysicsLocation().add(forward.negate().mult(-10f)) // 20 units behind
-                        .add(0, 6f, 0);
+                        .add(0, 4f, 0);
 
         // Interpolate camera position
         float lerpSpeed = 5f; // higher = faster
@@ -280,7 +285,7 @@ public class Main extends SimpleApplication
         cam.lookAt(control.getPhysicsLocation().add(0, 2f, 0), Vector3f.UNIT_Y);
     }
 
-    private void UpdateGUI(float speed, VehicleControl control) {
+    private void updateGUI(float speed, VehicleControl control) {
         speedText.setText(String.format("Speed: %.1f km/h", speed));
 
         frontLeftText.setText(String.format("FL: %.1f", control.getWheel(0).getFrictionSlip()));
