@@ -68,8 +68,12 @@ public class TerrainGenerator{
         this.manager = manager;
     }
 
-    public float[][] generateHeightMap(int size, double scale, ChunkCoord chunk, List<Vector2f> pathPoints) throws IOException {
-        return heightMap.generateHeightmap(size, size, SEED, scale, chunk.x, chunk.z, pathPoints);
+    public float[][] generateHeightMap(ChunkCoord chunk) throws IOException {
+        return heightMap.generateHeightmap(CHUNK_SIZE, CHUNK_SIZE, SEED, SCALE, chunk.x, chunk.z);
+    }
+
+    public void updateHeightMap(float[][] terrain, ChunkCoord chunk, List<Vector2f> pathPoints) {
+        heightMap.applyRoadFlattening(terrain, CHUNK_SIZE, CHUNK_SIZE, chunk.x, chunk.z, pathPoints);
     }
 
     public Mesh generateChunkMesh(float[][] terrain)
@@ -195,7 +199,7 @@ public class TerrainGenerator{
         return normals;
     }
 
-    public Geometry createGeometry(ChunkCoord chunk, Mesh mesh, float[][] heightmap) {
+    public Geometry createGeometry(ChunkCoord chunk, Mesh mesh) {
         Geometry chunkGeom = new Geometry("Chunk_" + chunk.x + "_" + chunk.z, mesh);
         Material mat = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
         mat.setBoolean("UseVertexColor", true);
@@ -224,12 +228,13 @@ public class TerrainGenerator{
 
         final ChunkCoord chunk = new ChunkCoord(0, 0);
 
-        Future<?> future = executor.submit(() -> {
             try {
-                List<Vector2f> pathPoints = generator.getRoadPointsInChunk(chunk.x, chunk.z);
-                float[][] terrain = generateHeightMap(CHUNK_SIZE, SCALE, chunk, pathPoints);
+                float[][] terrain = generateHeightMap(chunk);
+                List<Vector2f> pathPoints = generator.getRoadPointsInChunk(chunk.x, chunk.z, terrain);
+                updateHeightMap(terrain, chunk, pathPoints);
+
                 Mesh mesh = generateChunkMesh(terrain);
-                Geometry chunkGeom = createGeometry(chunk, mesh, terrain);
+                Geometry chunkGeom = createGeometry(chunk, mesh);
 
                 main.enqueue(() -> {
                     manager.addChunk(chunk, chunkGeom);
@@ -241,9 +246,7 @@ public class TerrainGenerator{
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        });
 
-        chunkTasks.add(future);
     }
 
     public List<Future<?>> getChunkTasks() {
@@ -254,7 +257,7 @@ public class TerrainGenerator{
         float[][] spawnChunk = null;
         try {
             spawnChunk =
-                    generateHeightMap(CHUNK_SIZE, SCALE, new ChunkCoord(0, 0), new ArrayList<>());
+                    generateHeightMap(new ChunkCoord(0, 0));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

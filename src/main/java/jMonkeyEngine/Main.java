@@ -266,6 +266,7 @@ public class Main extends SimpleApplication
         inputManager.addMapping("GUI", new KeyTrigger(KeyInput.KEY_G));
         inputManager.addMapping("Pause", new KeyTrigger(KeyInput.KEY_ESCAPE));
         inputManager.addMapping("Quit", new KeyTrigger(KeyInput.KEY_Q));
+        inputManager.addMapping("Debug", new KeyTrigger(KeyInput.KEY_L));
 
         inputManager.addListener(this, "Left");
         inputManager.addListener(this, "Right");
@@ -276,6 +277,7 @@ public class Main extends SimpleApplication
         inputManager.addListener(this, "GUI");
         inputManager.addListener(this, "Pause");
         inputManager.addListener(this, "Quit");
+        inputManager.addListener(this, "Debug");
     }
 
     private void enablePlayerControls(boolean enabled) {
@@ -334,6 +336,10 @@ public class Main extends SimpleApplication
 
         if (binding.equals("Quit") && !value && isPaused) {
            stop();
+        }
+
+        if (binding.equals("Debug") && !value) {
+            bulletAppState.setDebugEnabled(!bulletAppState.isDebugEnabled());
         }
     }
 

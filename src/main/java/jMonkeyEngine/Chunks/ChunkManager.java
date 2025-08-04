@@ -68,12 +68,12 @@ public class ChunkManager {
                     loadingChunks.add(chunk);
                     executor.submit(() -> {
                         try {
-                            List<Vector2f> pathPoints = road.getRoadPointsInChunk(chunk.x, chunk.z);
-                            float[][] terrain = generator.generateHeightMap(CHUNK_SIZE, SCALE,
-                                                                            chunk, pathPoints);
+                            float[][] terrain = generator.generateHeightMap(chunk);
+                            List<Vector2f> pathPoints = road.getRoadPointsInChunk(chunk.x, chunk.z, terrain);
+                            generator.updateHeightMap(terrain, chunk, pathPoints);
 
                             Mesh mesh = generator.generateChunkMesh(terrain);
-                            Geometry chunkGeom = generator.createGeometry(chunk, mesh, terrain);
+                            Geometry chunkGeom = generator.createGeometry(chunk, mesh);
 
                             main.enqueue(() -> {
                                 loadedChunks.put(chunk, chunkGeom);
