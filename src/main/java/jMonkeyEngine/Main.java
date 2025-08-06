@@ -55,7 +55,7 @@ public class Main extends SimpleApplication
     private boolean followCam = true;
     private boolean gui = false;
 
-    private final int CHUNK_SIZE = 500;
+    private final int CHUNK_SIZE = 1000;
     private final float SCALE = 40f;
     private long SEED;
 
@@ -95,7 +95,7 @@ public class Main extends SimpleApplication
                                  SCALE, 1);
         generator.setChunkManager(manager);
 
-        spawnHeight = generator.getSpawnHeight() + 0.5f;
+        spawnHeight = generator.getSpawnHeight() + 1f;
 
         guiGroupNode = new Node("guiGroupNode");
 
@@ -227,7 +227,8 @@ public class Main extends SimpleApplication
     private void initCar() {
         car = new Car(assetManager, bulletAppState.getPhysicsSpace());
         // Set desired spawn location
-        Vector3f spawnPosition = new Vector3f(5f, spawnHeight, 5f);
+        float zSpawn = (CHUNK_SIZE / 2) * (SCALE / 16);
+        Vector3f spawnPosition = new Vector3f(5f, spawnHeight, zSpawn);
         Quaternion rotation = new Quaternion();
         rotation.fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y);
 
