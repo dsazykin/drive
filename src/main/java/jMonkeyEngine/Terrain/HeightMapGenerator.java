@@ -22,8 +22,7 @@ public class HeightMapGenerator {
         SCALE = scale;
     }
 
-    public float[][] generateHeightmap(int chunkX, int chunkZ)
-            throws IOException {
+    public float[][] generateHeightmap(int chunkX, int chunkZ) {
         float[][] heightmap = new float[CHUNK_SIZE][CHUNK_SIZE];
 
         for (int x = 0; x < CHUNK_SIZE; x++) {
@@ -49,66 +48,12 @@ public class HeightMapGenerator {
         return heightmap;
     }
 
-//    public void applyRoadFlattening(float[][] heightmap, int width, int height, float scale,
-//                                    int chunkX, int chunkZ, long seed, List<Vector2f> roadPath
-//    ) {
-//        float roadWidth = 0.25f;
-//        float flattenStrength = 0.0000000001f;
-//
-//        for (int x = 0; x < width; x++) {
-//            for (int y = 0; y < height; y++) {
-//                double worldX = (chunkX * (width - 1) + x) / scale;
-//                double worldY = (chunkZ * (height - 1) + y) / scale;
-//
-//                float terrainHeight = heightmap[x][y];
-//
-//                // Compute closest road point
-//                float closestDistance = Float.MAX_VALUE;
-//                float roadHeightSampleZ = (float) worldY;
-//
-//                for (Vector2f roadPoint : roadPath) {
-//                    float dx = (float) worldX - roadPoint.x;
-//                    float dz = (float) worldY - roadPoint.y;
-//                    float distSq = dx * dx + dz * dz;
-//                    if (distSq < closestDistance) {
-//                        closestDistance = distSq;
-//                        roadHeightSampleZ = roadPoint.y;
-//                    }
-//                }
-//
-//                float distance = (float) Math.sqrt(closestDistance);
-//                float falloff = Math.max(0f, 1f - (distance / (roadWidth / 2f)));
-//                falloff = falloff * falloff * (3f - 2f * falloff); // smoothstep
-//
-//                float roadHeight = 100f * OpenSimplex2.noise2(seed, 0.07f * worldX, 0.07f * roadHeightSampleZ) +
-//                        4f * OpenSimplex2.noise2(seed, 0.25f * worldX, 0.25f * roadHeightSampleZ) +
-//                        0.6f * OpenSimplex2.noise2(seed, 0.75f * worldX, 0.75f * roadHeightSampleZ);
-//                roadHeight /= (100f + 4f + 0.6f);
-//
-//                float finalHeight = FastMath.interpolateLinear(falloff * flattenStrength, terrainHeight, roadHeight);
-//                if (falloff > 0f) finalHeight += 2f;
-//
-//                heightmap[x][y] = finalHeight;
-//            }
-//        }
-//    }
-
-    public void applyRoadFlattening(float[][] heightmap, int chunkX, int chunkZ, List<Node> roadPath) {
-        //System.out.println(roadPath);
+    public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath) {
         for (Node roadPoint : roadPath) {
             int x = roadPoint.x;
             int z = roadPoint.y;
 
-            int xStart = chunkX * (CHUNK_SIZE - 1);
-            int zStart = chunkZ * (CHUNK_SIZE - 1);
-
-            int localX = (int) FastMath.clamp(x - xStart, 0, CHUNK_SIZE - 1);
-            int localZ = (int) FastMath.clamp(z - zStart, 0, CHUNK_SIZE - 1);
-
-            //System.out.println("x: " + localX + " z: " + localZ);
-
             float roadHeight = heightmap[x][z];
-            //System.out.println("road height: " + roadHeight);
 
             for (int i = -1; i <= 1; i++) {
                 for (int j = -1; j <= 1; j++) {
@@ -117,7 +62,6 @@ public class HeightMapGenerator {
                 }
             }
 
-            //System.out.println(heightmap[localX][localZ]);
         }
     }
 
@@ -173,7 +117,7 @@ public class HeightMapGenerator {
 
         float[][] heightmap = generator.generateHeightmap(1, 0);
         List<Node> path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
-        generator.applyRoadFlattening(heightmap, 1, 0, path);
+        generator.applyRoadFlattening(heightmap, path);
         generator.generateImage(1, 0, heightmap);
 
 //        for (int i = 0; i < heightmap.length; i++) {

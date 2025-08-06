@@ -72,14 +72,11 @@ public class TerrainGenerator{
         return heightMap.generateHeightmap(chunk.x, chunk.z);
     }
 
-    public void updateHeightMap(float[][] terrain, ChunkCoord chunk, List<jMonkeyEngine.Road.Node> pathPoints)
-            throws IOException {
-        heightMap.applyRoadFlattening(terrain, chunk.x, chunk.z, pathPoints);
-        heightMap.generateImage(chunk.x, chunk.z, terrain);
+    public void updateHeightMap(float[][] terrain, ChunkCoord chunk, List<jMonkeyEngine.Road.Node> pathPoints) {
+        heightMap.applyRoadFlattening(terrain, pathPoints);
     }
 
-    public Mesh generateChunkMesh(float[][] terrain)
-            throws IOException {
+    public Mesh generateChunkMesh(float[][] terrain){
         Mesh mesh = new Mesh();
 
         Vector3f[] vertices = new Vector3f[CHUNK_SIZE * CHUNK_SIZE];
@@ -267,6 +264,6 @@ public class TerrainGenerator{
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return spawnChunk[0][0] * MAX_HEIGHT;
+        return spawnChunk[0][CHUNK_SIZE / 2] * MAX_HEIGHT;
     }
 }
