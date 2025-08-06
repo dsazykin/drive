@@ -55,7 +55,7 @@ public class Main extends SimpleApplication
     private boolean followCam = true;
     private boolean gui = false;
 
-    private final int CHUNK_SIZE = 100;
+    private final int CHUNK_SIZE = 500;
     private final float SCALE = 40f;
     private long SEED;
 
@@ -87,12 +87,12 @@ public class Main extends SimpleApplication
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
 
-        road = new RoadGenerator(CHUNK_SIZE, SCALE, SEED);
+        road = new RoadGenerator();
         generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, road, this, executor,
                                          CHUNK_SIZE, SCALE, SEED, 200);
         this.manager =
                 new ChunkManager(bulletAppState, rootNode, road, generator, this, executor, CHUNK_SIZE,
-                                 SCALE, 3, 200);
+                                 SCALE, 1, 200);
         generator.setChunkManager(manager);
 
         spawnHeight = generator.getSpawnHeight() + 0.5f;

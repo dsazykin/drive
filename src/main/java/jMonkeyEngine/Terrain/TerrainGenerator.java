@@ -36,7 +36,7 @@ public class TerrainGenerator{
     private final AssetManager assetManager;
     private final HeightMapGenerator heightMap;
     private ChunkManager manager;
-    private final RoadGenerator generator;
+    private final RoadGenerator road;
     private final SimpleApplication main;
     private final ExecutorService executor;
 
@@ -48,20 +48,20 @@ public class TerrainGenerator{
     private List<Future<?>> chunkTasks;
 
     public TerrainGenerator(BulletAppState bulletAppState,
-                            Node rootNode, AssetManager assetManager, RoadGenerator generator, SimpleApplication main,
+                            Node rootNode, AssetManager assetManager, RoadGenerator road, SimpleApplication main,
                             ExecutorService executor, int chunkSize, float SCALE, Long seed,
                             int maxHeight) {
         this.bulletAppState = bulletAppState;
         this.rootNode = rootNode;
         this.assetManager = assetManager;
-        this.generator = generator;
+        this.road = road;
         this.main = main;
         this.executor = executor;
         this.CHUNK_SIZE = chunkSize;
         this.SCALE = SCALE;
         this.SEED = seed;
         MAX_HEIGHT = maxHeight;
-        this.heightMap = new HeightMapGenerator();
+        this.heightMap = new HeightMapGenerator(SEED, CHUNK_SIZE, SCALE);
     }
 
     public void setChunkManager(ChunkManager manager) {
@@ -69,11 +69,13 @@ public class TerrainGenerator{
     }
 
     public float[][] generateHeightMap(ChunkCoord chunk) throws IOException {
-        return heightMap.generateHeightmap(CHUNK_SIZE, CHUNK_SIZE, SEED, SCALE, chunk.x, chunk.z);
+        return heightMap.generateHeightmap(chunk.x, chunk.z);
     }
 
-    public void updateHeightMap(float[][] terrain, ChunkCoord chunk, List<Vector2f> pathPoints) {
-        heightMap.applyRoadFlattening(terrain, CHUNK_SIZE, CHUNK_SIZE, chunk.x, chunk.z, pathPoints);
+    public void updateHeightMap(float[][] terrain, ChunkCoord chunk, List<jMonkeyEngine.Road.Node> pathPoints)
+            throws IOException {
+        heightMap.applyRoadFlattening(terrain, chunk.x, chunk.z, pathPoints);
+        heightMap.generateImage(chunk.x, chunk.z, terrain);
     }
 
     public Mesh generateChunkMesh(float[][] terrain)
@@ -218,7 +220,7 @@ public class TerrainGenerator{
 
         mesh.updateBound();
         mesh.updateCounts();
-        TangentBinormalGenerator.generate(mesh);
+        //TangentBinormalGenerator.generate(mesh);
 
         return chunkGeom;
     }
@@ -230,8 +232,12 @@ public class TerrainGenerator{
 
             try {
                 float[][] terrain = generateHeightMap(chunk);
-                List<Vector2f> pathPoints = generator.getRoadPointsInChunk(chunk.x, chunk.z, terrain);
-                updateHeightMap(terrain, chunk, pathPoints);
+                if (chunk.x == 0) {
+                    List<jMonkeyEngine.Road.Node> pathPoints =
+                            road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
+                                                      CHUNK_SIZE - 1, CHUNK_SIZE / 2);
+                    updateHeightMap(terrain, chunk, pathPoints);
+                }
 
                 Mesh mesh = generateChunkMesh(terrain);
                 Geometry chunkGeom = createGeometry(chunk, mesh);

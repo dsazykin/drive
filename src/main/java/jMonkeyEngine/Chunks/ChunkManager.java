@@ -69,8 +69,12 @@ public class ChunkManager {
                     executor.submit(() -> {
                         try {
                             float[][] terrain = generator.generateHeightMap(chunk);
-                            List<Vector2f> pathPoints = road.getRoadPointsInChunk(chunk.x, chunk.z, terrain);
-                            generator.updateHeightMap(terrain, chunk, pathPoints);
+                            if (chunkX == 0) {
+                                List<jMonkeyEngine.Road.Node> pathPoints =
+                                        road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
+                                                                  CHUNK_SIZE - 1, CHUNK_SIZE / 2);
+                                generator.updateHeightMap(terrain, chunk, pathPoints);
+                            }
 
                             Mesh mesh = generator.generateChunkMesh(terrain);
                             Geometry chunkGeom = generator.createGeometry(chunk, mesh);

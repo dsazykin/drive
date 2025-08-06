@@ -1,7 +1,7 @@
 package jMonkeyEngine.Terrain;
 
 import com.jme3.math.FastMath;
-import com.jme3.math.Vector2f;
+import jMonkeyEngine.Road.Node;
 import jMonkeyEngine.Road.RoadGenerator;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -12,25 +12,33 @@ import javax.imageio.ImageIO;
 
 public class HeightMapGenerator {
 
-    static long seed = 600092672;
+    private final long SEED;
+    private final int CHUNK_SIZE;
+    private final double SCALE;
 
-    public float[][] generateHeightmap(int width, int height, long seed, double scale, int chunkX, int chunkZ)
+    public HeightMapGenerator(long seed, int chunkSize, double scale) {
+        SEED = seed;
+        CHUNK_SIZE = chunkSize;
+        SCALE = scale;
+    }
+
+    public float[][] generateHeightmap(int chunkX, int chunkZ)
             throws IOException {
-        float[][] heightmap = new float[width][height];
+        float[][] heightmap = new float[CHUNK_SIZE][CHUNK_SIZE];
 
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                double worldX = (chunkX * (width - 1) + x) / scale;
-                double worldY = (chunkZ * (height - 1) + y) / scale;
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int y = 0; y < CHUNK_SIZE; y++) {
+                double worldX = (chunkX * (CHUNK_SIZE - 1) + x) / SCALE;
+                double worldY = (chunkZ * (CHUNK_SIZE - 1) + y) / SCALE;
 
                 // === Terrain noise ===
-                float e = 40f * OpenSimplex2.noise2(seed, 0.05f * worldX, 0.05f * worldY) +
-                        6f * OpenSimplex2.noise2(seed, 0.25f * worldX, 0.25f * worldY) +
-                        0.9f * OpenSimplex2.noise2(seed, 0.5f * worldX, 0.5f * worldY) +
-                        0.6f * OpenSimplex2.noise2(seed, 0.75f * worldX, 0.75f * worldY);
+                float e = 40f * OpenSimplex2.noise2(SEED, 0.05f * worldX, 0.05f * worldY) +
+                        6f * OpenSimplex2.noise2(SEED, 0.25f * worldX, 0.25f * worldY) +
+                        0.9f * OpenSimplex2.noise2(SEED, 0.5f * worldX, 0.5f * worldY) +
+                        0.6f * OpenSimplex2.noise2(SEED, 0.75f * worldX, 0.75f * worldY);
                 e = e / (40f + 6f + 0.9f + 0.6f);
                 e = (e + 1f) / 2f;
-                e = FastMath.pow(e, 0.75f);
+                e = FastMath.pow(e, 0.8f);
                 float terrainHeight = e;
 
                 heightmap[x][y] = terrainHeight;
@@ -85,28 +93,27 @@ public class HeightMapGenerator {
 //        }
 //    }
 
-    public void applyRoadFlattening(float[][] heightmap, int width, int height, int chunkX,
-                                    int chunkZ, List<Vector2f> roadPath) {
+    public void applyRoadFlattening(float[][] heightmap, int chunkX, int chunkZ, List<Node> roadPath) {
         //System.out.println(roadPath);
-        for (Vector2f roadPoint : roadPath) {
-            int x = Math.round(roadPoint.x);
-            int z = Math.round(roadPoint.y);
+        for (Node roadPoint : roadPath) {
+            int x = roadPoint.x;
+            int z = roadPoint.y;
 
-            int xStart = chunkX * (width - 1);
-            int zStart = chunkZ * (height - 1);
+            int xStart = chunkX * (CHUNK_SIZE - 1);
+            int zStart = chunkZ * (CHUNK_SIZE - 1);
 
-            int localX = (int) FastMath.clamp(x - xStart, 0, 499);
-            int localZ = (int) FastMath.clamp(z - zStart, 0, 499);
+            int localX = (int) FastMath.clamp(x - xStart, 0, CHUNK_SIZE - 1);
+            int localZ = (int) FastMath.clamp(z - zStart, 0, CHUNK_SIZE - 1);
 
             //System.out.println("x: " + localX + " z: " + localZ);
 
             float roadHeight = heightmap[localX][localZ];
             //System.out.println("road height: " + roadHeight);
 
-            for (int i = -3; i <= 3; i++) {
-                for (int j = -3; j <= 3; j++) {
+            for (int i = -1; i <= 1; i++) {
+                for (int j = -1; j <= 1; j++) {
                     if (localX + i < 0 || localZ + j < 0 || localX + i >= heightmap.length || localZ + j >= heightmap[0].length) continue;
-                    heightmap[localX + i][localZ + j] = roadHeight + 2;
+                    heightmap[localX + i][localZ + j] += 2;
                 }
             }
 
@@ -114,11 +121,11 @@ public class HeightMapGenerator {
         }
     }
 
-    private void generateImage(int width, int height, int chunkX, int chunkZ, float[][] heightmap) throws IOException {
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+    public void generateImage(int chunkX, int chunkZ, float[][] heightmap) throws IOException {
+        BufferedImage image = new BufferedImage(CHUNK_SIZE, CHUNK_SIZE, BufferedImage.TYPE_INT_RGB);
 
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int y = 0; y < CHUNK_SIZE; y++) {
                 double noiseValue = heightmap[x][y];
                 int rgb;
                 if (noiseValue < 0.1)
@@ -158,13 +165,16 @@ public class HeightMapGenerator {
     }
 
     public static void main(String[] args) throws IOException {
-        HeightMapGenerator generator = new HeightMapGenerator();
-        RoadGenerator road = new RoadGenerator(500, 40, seed);
+        Long seed = 946496062586794636L;
+        int chunkSize = 1000;
+        float scale = 40;
+        HeightMapGenerator generator = new HeightMapGenerator(seed, chunkSize, scale);
+        RoadGenerator road = new RoadGenerator();
 
-//        float[][] heightmap = generator.generateHeightmap(500, 500, seed, 40, 0, 0);
-//        List<Vector2f> roadPoints = road.getRoadPointsInChunk(0, 0, heightmap);
-//        generator.applyRoadFlattening(heightmap, 500, 500, 0, 0, roadPoints);
-//        generator.generateImage(500, 500, 0, 0, heightmap);
+        float[][] heightmap = generator.generateHeightmap(0, 0);
+        List<Node> path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
+        generator.applyRoadFlattening(heightmap, 0, 0, path);
+        generator.generateImage(0, 0, heightmap);
 
 //        for (int i = 0; i < heightmap.length; i++) {
 //            for (int j = 0; j < heightmap[i].length; j++) {
@@ -173,13 +183,13 @@ public class HeightMapGenerator {
 //            System.out.println();
 //        }
 
-        for (int x = -1; x < 2; x++) {
-            for (int z = -1; z < 2; z++) {
-                float[][] heightmap = generator.generateHeightmap(500, 500, seed, 40, x, z);
-                List<Vector2f> roadPoints = road.getRoadPointsInChunk(x, z, heightmap);
-                generator.applyRoadFlattening(heightmap, 500, 500, x, z, roadPoints);
-                generator.generateImage(500, 500, x, z, heightmap);
-            }
-        }
+//        for (int x = -1; x < 2; x++) {
+//            for (int z = -1; z < 2; z++) {
+//                float[][] heightmap = generator.generateHeightmap(500, 500, seed, 40, x, z);
+//                List<Vector2f> roadPoints = road.getRoadPointsInChunk(x, z, heightmap);
+//                generator.applyRoadFlattening(heightmap, 500, 500, x, z, roadPoints);
+//                generator.generateImage(500, 500, x, z, heightmap);
+//            }
+//        }
     }
 }

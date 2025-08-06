@@ -10,135 +10,105 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RoadGenerator {
-    private List<Vector2f> pathPoints = Collections.synchronizedList(new ArrayList<>());
-    private Vector2f currentPosition = new Vector2f(0, 0);
 
-    private final int CHUNK_SIZE;
-    private final float SCALE;
-    private final long SEED;
+    public int lastZCoord;
 
-    private final float STEP_SIZE = 7f;
-    private final float FREQ = 0.1f;
-
-    public RoadGenerator(int chunkSize, float scale,
-                         long seed) {
-        pathPoints.add(currentPosition.clone()); // starting point
-
-        CHUNK_SIZE = chunkSize;
-        SCALE = scale;
-        SEED = seed;
+    private List<int[]> generateOffsets(int radius) {
+        List<int[]> offsets = new ArrayList<>();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                if (dx == 0 && dy == 0) continue;
+                double dist = Math.sqrt(dx * dx + dy * dy);
+                if (Math.abs(dist - radius) < 0.5) {
+                    offsets.add(new int[]{dx, dy});
+                }
+            }
+        }
+        return offsets;
     }
 
-    private float angleAt(Vector2f pos) {
-        return (float) (OpenSimplex2.noise2(SEED + 5678, pos.x * FREQ, pos.y * FREQ) * Math.PI);
-    }
+    public List<Node> getRoadPointsInChunk(float[][] heightmap, int startX, int startY, int goalX, int goalY) {
+        int rows = heightmap.length;
+        int cols = heightmap[0].length;
 
-    // Returns the portion of the road that intersects the chunk bounds
-    public List<Vector2f> getRoadPointsInChunk(int chunkX, int chunkZ, float[][] terrain) {
-        List<Vector2f> result = new ArrayList<>();
+        PriorityQueue<Node> openSet = new PriorityQueue<>();
+        boolean[][] visited = new boolean[rows][cols];
+        Node[][] nodeMap = new Node[rows][cols];
 
-        // World bounds of this chunk
-        float minX = chunkX * (CHUNK_SIZE - 1);
-        float maxX = minX + (CHUNK_SIZE - 1);
-        float minZ = chunkZ * (CHUNK_SIZE - 1);
-        float maxZ = minZ + (CHUNK_SIZE - 1);
+        Node start = new Node(startX, startY, 0, heuristic(startX, startY, goalX, goalY),null);
+        openSet.add(start);
+        nodeMap[startX][startY] = start;
 
-        // Trace from a start point (e.g., (0,0)) until we're well past the current chunk
-        Vector2f pos = new Vector2f(0, 0);
-
-        for (int i = 0; i < 100; i++) {
-            float x = pos.x;
-            float z = pos.y;
-
-            // Only keep road points that fall within this chunk
-            if (x >= minX - 1 && x <= maxX + 1 && z >= minZ - 1 && z <= maxZ + 1) {
-                result.add(pos.clone());
+        while (!openSet.isEmpty()) {
+            Node current = openSet.poll();
+            if (current.x == goalX) {
+                return reconstructPath(current);
             }
 
-            // Stop once we're well beyond this chunk (to limit trace length)
-            if (x > maxX + 2 && z > maxZ + 2) break;
+            visited[current.x][current.y] = true;
 
-            // March to next point
-            float angle = angleAt(pos);
-            pos = findBestDirection(0, pos, terrain, 2);
-//            Vector2f dir =
-//                    new Vector2f(FastMath.cos(angle), FastMath.sin(angle)).normalizeLocal();
-//            pos = pos.add(dir.mult(STEP_SIZE));
-            //System.out.println("found best point");
-        }
+            List<int[]> directions = generateOffsets(5);
+            for (int[] dir : directions) {
+                int nx = current.x + dir[0];
+                int ny = current.y + dir[1];
 
-        return result;
-    }
+                if (nx >= 0 && ny >= 0 && nx < rows && ny < cols && !visited[nx][ny]) {
+                    int dx = dir[0];
+                    int dy = dir[1];
 
-    private static final float ANGLE_STEP = 0.2f; // adjust for granularity
-    private static final float ANGLE_RANGE = (float) (Math.PI / 2);
+                    float dot = current.dxFromParent * dx + current.dyFromParent * dy;
+                    float mag2 = dx * dx + dy * dy;
 
-    private Vector2f findBestDirection(float angle, Vector2f pos, float[][] terrain, int depth) {
-        Result best = recursiveSearch(angle, pos, terrain, depth, terrain[(int) pos.x][(int) pos.y], null);
-        if (best == null || best.firstMove == null) {
-            System.err.println("⚠️ No valid path found from position " + pos);
-            return pos; // fallback: stay in place
-        }
-        return best.firstMove;
-    }
+                    float cosAngle = dot / (current.dirMag * (float) Math.sqrt(mag2));
 
-    private Result recursiveSearch(float angle, Vector2f pos, float[][] terrain, int depth, float prevHeight, Vector2f firstMove) {
-        if (depth == 0) {
-            return new Result(0f, firstMove);
-        }
+                    if (Double.isNaN(cosAngle)) {
+                        cosAngle = 1;
+                    }
 
-        Result bestResult = null;
+                    if (cosAngle > 0) {
+                        float heightWeight = 10000.0f * (rows * 2);
 
-        for (float delta = -ANGLE_RANGE; delta <= ANGLE_RANGE; delta += ANGLE_STEP) {
-            float newAngle = angle + delta;
-            Vector2f dir =
-                    new Vector2f(FastMath.cos(newAngle), FastMath.sin(newAngle)).normalizeLocal();
-            Vector2f newPos = pos.add(dir.mult(STEP_SIZE));
+                        float heightDiff = Math.abs(heightmap[current.x][current.y] - heightmap[nx][ny]);
 
-            int x = Math.round(newPos.x);
-            int y = Math.round(newPos.y);
+                        float distance = (float) Math.sqrt(dx * dx + dy * dy);
+                        float baseCost = distance * 10f;
 
-            if (x < 0 || y < 0 || x >= terrain.length || y >= terrain[0].length)
-                continue;
+                        float moveCost = baseCost + (heightWeight * heightDiff);
 
-            float height = terrain[x][y];
-            float heightCost = FastMath.abs(prevHeight - height) * 15f;
-            float directionCost = (pos.x - newPos.x) * 0.05f;
-            float currentStepCost = heightCost + directionCost;
+                        //                        float angleCos = (mag1 == 0 || mag2 == 0) ? 1 : dot / (mag1 * mag2);
+                        //                        float anglePenalty = (1 - angleCos) * -10; // more penalty for sharper turns
 
-//            System.out.println("angle: " + newAngle);
-//            System.out.println("x: " + newPos.x + " y: " + newPos.y);
-//            System.out.println("height cost: " + heightCost);
-//            System.out.println("direction cost: " + directionCost);
-//            System.out.println("step cost: " + currentStepCost);
+                        float tentativeG = current.gCost + moveCost;
 
-            Vector2f initialMove = (firstMove == null) ? newPos : firstMove;
-
-            Result recursive =
-                    recursiveSearch(0, newPos, terrain, depth - 1, height, initialMove);
-            if (recursive == null)
-                continue;
-
-            float totalCost = currentStepCost + recursive.totalCost;
-
-            if (bestResult == null || totalCost < bestResult.totalCost) {
-                bestResult = new Result(totalCost, initialMove);
+                        Node neighbor = nodeMap[nx][ny];
+                        if (neighbor == null || tentativeG < neighbor.gCost) {
+                            int h = heuristic(nx, ny, goalX, goalY);
+                            neighbor = new Node(nx, ny, tentativeG, tentativeG + h, current, dx, dy);
+                            nodeMap[nx][ny] = neighbor;
+                            openSet.add(neighbor);
+                        }
+                    }
+                }
             }
-
-            //System.out.println("angle checked");
         }
 
-        return bestResult;
+        return Collections.emptyList(); // No path found
     }
 
-    private static class Result {
-        float totalCost;
-        Vector2f firstMove; // ← best direction to move from the original pos
+    private int heuristic(int x1, int y1, int x2, int y2) {
+        return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+    }
 
-        public Result(float totalCost, Vector2f firstMove) {
-            this.totalCost = totalCost;
-            this.firstMove = firstMove;
+    private List<Node> reconstructPath(Node end) {
+        lastZCoord = end.y;
+
+        List<Node> path = new ArrayList<>();
+        Node current = end;
+        while (current != null) {
+            path.add(current);
+            current = current.parent;
         }
+        Collections.reverse(path);
+        return path;
     }
-
 }
