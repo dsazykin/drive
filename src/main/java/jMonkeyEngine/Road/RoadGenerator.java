@@ -29,7 +29,7 @@ public class RoadGenerator {
         boolean[][] visited = new boolean[rows][cols];
         Node[][] nodeMap = new Node[rows][cols];
 
-        Node start = new Node(startX, startY, 0, heuristic(startX, startY, goalX, goalY),null);
+        Node start = new Node(startX, startY, getRoadHeight(startX, startY, heightmap), 0, heuristic(startX, startY, goalX, goalY),null);
         openSet.add(start);
         nodeMap[startX][startY] = start;
 
@@ -74,10 +74,12 @@ public class RoadGenerator {
 
                         float tentativeG = current.gCost + moveCost;
 
+                        float roadHeight = getRoadHeight(nx, ny, heightmap);
+
                         Node neighbor = nodeMap[nx][ny];
                         if (neighbor == null || tentativeG < neighbor.gCost) {
                             int h = heuristic(nx, ny, goalX, goalY);
-                            neighbor = new Node(nx, ny, tentativeG, tentativeG + h, current, dx, dy);
+                            neighbor = new Node(nx, ny, roadHeight, tentativeG, tentativeG + h, current, dx, dy);
                             nodeMap[nx][ny] = neighbor;
                             openSet.add(neighbor);
                         }
@@ -87,6 +89,35 @@ public class RoadGenerator {
         }
 
         return Collections.emptyList(); // No path found
+    }
+
+    private float getRoadHeight(int x, int y, float[][] terrain) {
+        float points = 1;
+        float sum = 0;
+
+        sum += terrain[x][y];
+
+        if (x + 1 < terrain.length) {
+            sum += terrain[x + 1][y];
+            points += 1;
+        }
+
+        if (x - 1 >= 0) {
+            sum += terrain[x - 1][y];
+            points += 1;
+        }
+
+        if (y + 1 < terrain[0].length) {
+            sum += terrain[x][y + 1];
+            points += 1;
+        }
+
+        if (y - 1 >= 0) {
+            sum += terrain[x][y - 1];
+            points += 1;
+        }
+
+        return sum / points;
     }
 
     private int heuristic(int x1, int y1, int x2, int y2) {

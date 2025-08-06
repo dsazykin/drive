@@ -53,12 +53,17 @@ public class HeightMapGenerator {
             int x = roadPoint.x;
             int z = roadPoint.y;
 
-            float roadHeight = heightmap[x][z];
+            heightmap[x][z] = roadPoint.height + 2;
 
-            for (int i = -1; i <= 1; i++) {
-                for (int j = -1; j <= 1; j++) {
+            for (int i = -3; i <= 3; i++) {
+                for (int j = -3; j <= 3; j++) {
                     if (x + i < 0 || z + j < 0 || x + i >= heightmap.length || z + j >= heightmap[0].length) continue;
-                    heightmap[x + i][z + j] += 2;
+                    if (heightmap[x + i][z + j] >= 2) {
+                        heightmap[x + i][z + j] =
+                                (((heightmap[x + i][z + j] - 2) + roadPoint.height) / 2) + 2;
+                    } else {
+                        heightmap[x + i][z + j] = roadPoint.height + 2;
+                    }
                 }
             }
 
@@ -110,7 +115,7 @@ public class HeightMapGenerator {
 
     public static void main(String[] args) throws IOException {
         Long seed = 946496062586794636L;
-        int chunkSize = 1000;
+        int chunkSize = 50;
         float scale = 40;
         HeightMapGenerator generator = new HeightMapGenerator(seed, chunkSize, scale);
         RoadGenerator road = new RoadGenerator();

@@ -3,19 +3,22 @@ package jMonkeyEngine.Road;
 public class Node implements Comparable<Node> {
     public int x;
     public int y;
+    public float height;
     public float gCost; // cost from start
     public float fCost; // gCost + heuristic
     public Node parent;
     public int dxFromParent, dyFromParent;
     public float dirMag;
 
-    public Node(int x, int y, float gCost, float fCost, Node parent) {
-        this(x, y, gCost, fCost, parent, 0, 0);
+    public Node(int x, int y, float height, float gCost, float fCost, Node parent) {
+        this(x, y, height, gCost, fCost, parent, 0, 0);
     }
 
-    public Node(int x, int y, float gCost, float fCost, Node parent, int dx, int dy) {
+    public Node(int x, int y, float height, float gCost, float fCost, Node parent, int dx,
+                int dy) {
         this.x = x;
         this.y = y;
+        this.height = height;
         this.gCost = gCost;
         this.fCost = fCost;
         this.parent = parent;
