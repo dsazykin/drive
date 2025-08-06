@@ -92,7 +92,7 @@ public class Main extends SimpleApplication
                                          CHUNK_SIZE, SCALE, SEED, 200);
         this.manager =
                 new ChunkManager(bulletAppState, rootNode, road, generator, this, executor, CHUNK_SIZE,
-                                 SCALE, 1, 200);
+                                 SCALE, 1);
         generator.setChunkManager(manager);
 
         spawnHeight = generator.getSpawnHeight() + 0.5f;

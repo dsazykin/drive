@@ -24,15 +24,14 @@ public class ChunkManager {
     private final int CHUNK_SIZE;
     private final float SCALE;
     private final int RENDER_DISTANCE;
-    private final int MAX_HEIGHT;
 
     Set<ChunkCoord> loadingChunks = ConcurrentHashMap.newKeySet();
     private final Map<ChunkCoord, Geometry> loadedChunks = new HashMap<>();
+    private final ConcurrentHashMap<ChunkCoord, Geometry> generatedChunks = new ConcurrentHashMap<>();
 
     public ChunkManager(BulletAppState bulletAppState, Node rootNode, RoadGenerator road,
                         TerrainGenerator generator, SimpleApplication main, ExecutorService executor,
-                        int chunkSize,
-                        float scale, int renderDistance, int maxHeight) {
+                        int chunkSize, float scale, int renderDistance) {
         this.rootNode = rootNode;
         this.bulletAppState = bulletAppState;
         this.generator = generator;
@@ -42,11 +41,11 @@ public class ChunkManager {
         this.CHUNK_SIZE = chunkSize;
         this.SCALE = scale;
         this.RENDER_DISTANCE = renderDistance;
-        MAX_HEIGHT = maxHeight;
     }
 
     public void addChunk(ChunkCoord thisChunk, Geometry chunk) {
         loadedChunks.put(thisChunk, chunk);
+        generatedChunks.put(thisChunk, chunk);
     }
 
     public void updateChunks(Vector3f playerPos) {
@@ -67,16 +66,25 @@ public class ChunkManager {
                     loadingChunks.add(chunk);
                     executor.submit(() -> {
                         try {
-                            float[][] terrain = generator.generateHeightMap(chunk);
-                            if (chunkZ == 0 && chunkX == road.currentXChunk ) {
-                                List<jMonkeyEngine.Road.Node> pathPoints =
-                                        road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
-                                                                  CHUNK_SIZE - 1, CHUNK_SIZE / 2);
-                                generator.updateHeightMap(terrain, chunk, pathPoints);
-                            }
+                            Geometry chunkGeom;
 
-                            Mesh mesh = generator.generateChunkMesh(terrain);
-                            Geometry chunkGeom = generator.createGeometry(chunk, mesh);
+                            if (generatedChunks.containsKey(chunk)) {
+                                chunkGeom = generatedChunks.get(chunk);
+                            } else {
+                                float[][] terrain = generator.generateHeightMap(chunk);
+                                if (chunkZ == 0 && chunkX == road.currentXChunk) {
+                                    List<jMonkeyEngine.Road.Node> pathPoints =
+                                            road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
+                                                                      CHUNK_SIZE - 1,
+                                                                      CHUNK_SIZE / 2);
+                                    generator.updateHeightMap(terrain, chunk, pathPoints);
+                                }
+
+                                Mesh mesh = generator.generateChunkMesh(terrain);
+                                chunkGeom = generator.createGeometry(chunk, mesh);
+
+                                generatedChunks.put(chunk, chunkGeom);
+                            }
 
                             main.enqueue(() -> {
                                 loadedChunks.put(chunk, chunkGeom);
