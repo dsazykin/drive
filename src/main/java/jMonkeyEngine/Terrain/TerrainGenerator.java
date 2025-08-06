@@ -232,9 +232,9 @@ public class TerrainGenerator{
 
             try {
                 float[][] terrain = generateHeightMap(chunk);
-                if (chunk.x == 0) {
+                if (chunk.z == 0) {
                     List<jMonkeyEngine.Road.Node> pathPoints =
-                            road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
+                            road.getRoadPointsInChunk(terrain, 0, CHUNK_SIZE / 2,
                                                       CHUNK_SIZE - 1, CHUNK_SIZE / 2);
                     updateHeightMap(terrain, chunk, pathPoints);
                 }

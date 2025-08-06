@@ -107,13 +107,13 @@ public class HeightMapGenerator {
 
             //System.out.println("x: " + localX + " z: " + localZ);
 
-            float roadHeight = heightmap[localX][localZ];
+            float roadHeight = heightmap[x][z];
             //System.out.println("road height: " + roadHeight);
 
             for (int i = -1; i <= 1; i++) {
                 for (int j = -1; j <= 1; j++) {
-                    if (localX + i < 0 || localZ + j < 0 || localX + i >= heightmap.length || localZ + j >= heightmap[0].length) continue;
-                    heightmap[localX + i][localZ + j] += 2;
+                    if (x + i < 0 || z + j < 0 || x + i >= heightmap.length || z + j >= heightmap[0].length) continue;
+                    heightmap[x + i][z + j] += 2;
                 }
             }
 
@@ -171,10 +171,10 @@ public class HeightMapGenerator {
         HeightMapGenerator generator = new HeightMapGenerator(seed, chunkSize, scale);
         RoadGenerator road = new RoadGenerator();
 
-        float[][] heightmap = generator.generateHeightmap(0, 0);
+        float[][] heightmap = generator.generateHeightmap(1, 0);
         List<Node> path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
-        generator.applyRoadFlattening(heightmap, 0, 0, path);
-        generator.generateImage(0, 0, heightmap);
+        generator.applyRoadFlattening(heightmap, 1, 0, path);
+        generator.generateImage(1, 0, heightmap);
 
 //        for (int i = 0; i < heightmap.length; i++) {
 //            for (int j = 0; j < heightmap[i].length; j++) {

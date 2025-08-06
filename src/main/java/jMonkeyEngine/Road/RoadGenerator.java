@@ -1,16 +1,10 @@
 package jMonkeyEngine.Road;
 
-import com.jme3.app.SimpleApplication;
-import com.jme3.asset.AssetManager;
-import com.jme3.math.FastMath;
-import com.jme3.math.Vector2f;
-import jMonkeyEngine.Chunks.ChunkCoord;
-import jMonkeyEngine.Terrain.OpenSimplex2;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class RoadGenerator {
 
+    public int currentXChunk = 0;
     public int lastZCoord;
 
     private List<int[]> generateOffsets(int radius) {
@@ -101,6 +95,7 @@ public class RoadGenerator {
 
     private List<Node> reconstructPath(Node end) {
         lastZCoord = end.y;
+        currentXChunk += 1;
 
         List<Node> path = new ArrayList<>();
         Node current = end;

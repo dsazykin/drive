@@ -3,7 +3,6 @@ package jMonkeyEngine.Chunks;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.RigidBodyControl;
-import com.jme3.math.Vector2f;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
@@ -69,7 +68,7 @@ public class ChunkManager {
                     executor.submit(() -> {
                         try {
                             float[][] terrain = generator.generateHeightMap(chunk);
-                            if (chunkX == 0) {
+                            if (chunkZ == 0 && chunkX == road.currentXChunk ) {
                                 List<jMonkeyEngine.Road.Node> pathPoints =
                                         road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
                                                                   CHUNK_SIZE - 1, CHUNK_SIZE / 2);
