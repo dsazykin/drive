@@ -16,6 +16,8 @@ public class HeightMapGenerator {
     private final int CHUNK_SIZE;
     private final double SCALE;
 
+    float prevHeight = Float.MAX_VALUE;
+
     public HeightMapGenerator(long seed, int chunkSize, double scale) {
         SEED = seed;
         CHUNK_SIZE = chunkSize;
@@ -55,8 +57,6 @@ public class HeightMapGenerator {
         float[][] targetHeights = new float[heightmap.length][heightmap[0].length];
         boolean[][] hasTarget = new boolean[heightmap.length][heightmap[0].length];
 
-        float prevHeight = Float.MAX_VALUE;
-
         for (int i = 0; i < roadPath.size() - 1; i++) {
             Node a = roadPath.get(i);
             Node b = roadPath.get(i + 1);
@@ -86,7 +86,7 @@ public class HeightMapGenerator {
                 if (rightH != 0) count++;
                 float currHeight = (leftH + rightH) / count + 2;
 
-                if (i > 0 || t > 0) {
+                if (prevHeight != Float.MAX_VALUE) {
                     currHeight = prevHeight * 0.9f + currHeight * 0.1f;
                 }
 
@@ -116,6 +116,13 @@ public class HeightMapGenerator {
             }
         }
 
+        smoothRoad(heightmap, hasTarget, targetHeights);
+
+        blendTerrain(heightmap, hasTarget, targetHeights);
+    }
+
+    private static void smoothRoad(float[][] heightmap, boolean[][] hasTarget,
+                                  float[][] targetHeights) {
         for (int x = 1; x < heightmap.length - 1; x++) {
             for (int z = 1; z < heightmap[0].length - 1; z++) {
                 if (hasTarget[x][z]) {
@@ -131,7 +138,10 @@ public class HeightMapGenerator {
                 }
             }
         }
+    }
 
+    private static void blendTerrain(float[][] heightmap, boolean[][] hasTarget,
+                                  float[][] targetHeights) {
         int featherRadius = 4;
 
         for (int x = 0; x < heightmap.length; x++) {
