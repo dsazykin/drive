@@ -132,6 +132,33 @@ public class HeightMapGenerator {
             }
         }
 
+        int featherRadius = 4;
+
+        for (int x = 0; x < heightmap.length; x++) {
+            for (int z = 0; z < heightmap[0].length; z++) {
+                if (hasTarget[x][z]) {
+                    float roadH = targetHeights[x][z] - 2;
+
+                    for (int dx = -featherRadius; dx <= featherRadius; dx++) {
+                        for (int dz = -featherRadius; dz <= featherRadius; dz++) {
+                            int nx = x + dx;
+                            int nz = z + dz;
+                            if (nx < 0 || nz < 0 || nx >= heightmap.length || nz >= heightmap[0].length) continue;
+                            if (hasTarget[nx][nz]) continue;
+
+                            float dist = (float)Math.sqrt(dx*dx + dz*dz);
+                            if (dist > featherRadius) continue;
+
+                            float t = dist / featherRadius;
+                            float originalH = heightmap[nx][nz];
+                            float blendedH = roadH * (1 - t) + originalH * t;
+
+                            heightmap[nx][nz] = blendedH;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private float sampleHeight(float[][] map, float x, float z) {
