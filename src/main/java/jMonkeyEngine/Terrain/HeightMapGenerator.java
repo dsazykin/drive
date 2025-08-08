@@ -115,6 +115,23 @@ public class HeightMapGenerator {
                 }
             }
         }
+
+        for (int x = 1; x < heightmap.length - 1; x++) {
+            for (int z = 1; z < heightmap[0].length - 1; z++) {
+                if (hasTarget[x][z]) {
+                    float sum = targetHeights[x][z];
+                    int count = 1;
+
+                    if (hasTarget[x-1][z]) { sum += targetHeights[x-1][z]; count++; }
+                    if (hasTarget[x+1][z]) { sum += targetHeights[x+1][z]; count++; }
+                    if (hasTarget[x][z-1]) { sum += targetHeights[x][z-1]; count++; }
+                    if (hasTarget[x][z+1]) { sum += targetHeights[x][z+1]; count++; }
+
+                    heightmap[x][z] = sum / count;
+                }
+            }
+        }
+
     }
 
     private float sampleHeight(float[][] map, float x, float z) {
