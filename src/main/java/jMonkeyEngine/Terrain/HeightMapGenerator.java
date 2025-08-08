@@ -87,7 +87,7 @@ public class HeightMapGenerator {
                 float currHeight = (leftH + rightH) / count + 2;
 
                 if (i > 0 || t > 0) {
-                    currHeight = prevHeight * 0.7f + currHeight * 0.3f;
+                    currHeight = prevHeight * 0.9f + currHeight * 0.1f;
                 }
 
                 prevHeight = currHeight;
