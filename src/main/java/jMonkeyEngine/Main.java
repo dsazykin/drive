@@ -33,7 +33,7 @@ public class Main extends SimpleApplication
     RoadGenerator road;
 
     private Car car;
-    private float spawnHeight;
+    private Vector3f resetPoint;
 
     private Node guiGroupNode;
     private BitmapText speedText;
@@ -95,7 +95,8 @@ public class Main extends SimpleApplication
                                  SCALE, 1);
         generator.setChunkManager(manager);
 
-        spawnHeight = generator.getSpawnHeight() + 1f;
+        float zSpawn = (CHUNK_SIZE / 2) * (SCALE / 16);
+        resetPoint = new Vector3f(5f, generator.getSpawnHeight() + 1f, zSpawn);
 
         guiGroupNode = new Node("guiGroupNode");
 
@@ -227,17 +228,15 @@ public class Main extends SimpleApplication
     private void initCar() {
         car = new Car(assetManager, bulletAppState.getPhysicsSpace());
         // Set desired spawn location
-        float zSpawn = (CHUNK_SIZE / 2) * (SCALE / 16);
-        Vector3f spawnPosition = new Vector3f(5f, spawnHeight, zSpawn);
         Quaternion rotation = new Quaternion();
         rotation.fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y);
 
         // Apply to the physics control (VehicleControl or similar)
-        car.getControl().setPhysicsLocation(spawnPosition);
+        car.getControl().setPhysicsLocation(resetPoint);
         car.getControl().setPhysicsRotation(rotation);
 
         // Optionally also apply to the visual node (if needed)
-        car.getCarNode().setLocalTranslation(spawnPosition);
+        car.getCarNode().setLocalTranslation(resetPoint);
         car.getCarNode().rotate(rotation);
 
         rootNode.attachChild(car.getCarNode());
@@ -314,11 +313,10 @@ public class Main extends SimpleApplication
             VehicleControl control = car.getControl();
             control.setLinearVelocity(new Vector3f(0,0,0));
             control.setAngularVelocity(new Vector3f(0,0,0));
-            Vector3f resetPosition = new Vector3f(5f, spawnHeight, 5f);
-            car.getControl().setPhysicsLocation(resetPosition);
+            car.getControl().setPhysicsLocation(resetPoint);
             car.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
 
-            car.getCarNode().setLocalTranslation(resetPosition);
+            car.getCarNode().setLocalTranslation(resetPoint);
             car.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
         }
 
@@ -352,7 +350,6 @@ public class Main extends SimpleApplication
             inputManager.setCursorVisible(true);
             flyCam.setEnabled(false);
             bulletAppState.setEnabled(false); // Pause physics
-            // Pause your own game logic here too
         } else {
             pauseMenuNode.setCullHint(Spatial.CullHint.Always); // Hide menu
             inputManager.setCursorVisible(false);
@@ -405,7 +402,7 @@ public class Main extends SimpleApplication
                         .add(0, 4f, 0);
 
         // Interpolate camera position
-        float lerpSpeed = 5f; // higher = faster
+        float lerpSpeed = 5f;
         cameraPos.interpolateLocal(targetCamPos, lerpSpeed * tpf);
         cam.setLocation(cameraPos);
 

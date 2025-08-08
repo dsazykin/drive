@@ -77,7 +77,7 @@ public class ChunkManager {
                                             road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
                                                                       CHUNK_SIZE - 1,
                                                                       CHUNK_SIZE / 2);
-                                    generator.updateHeightMap(terrain, chunk, pathPoints);
+                                    generator.updateHeightMap(terrain, pathPoints);
                                 }
 
                                 Mesh mesh = generator.generateChunkMesh(terrain);

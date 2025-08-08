@@ -72,7 +72,7 @@ public class TerrainGenerator{
         return heightMap.generateHeightmap(chunk.x, chunk.z);
     }
 
-    public void updateHeightMap(float[][] terrain, ChunkCoord chunk, List<jMonkeyEngine.Road.Node> pathPoints) {
+    public void updateHeightMap(float[][] terrain, List<jMonkeyEngine.Road.Node> pathPoints) {
         heightMap.applyRoadFlattening(terrain, pathPoints);
     }
 
@@ -110,7 +110,7 @@ public class TerrainGenerator{
                 }
 
                 if (height > 1) {
-                    height -= 2;
+                    height = height - (float)Math.floor(height);
                     color = new ColorRGBA(120f / 255f, 120f / 255f, 120f / 255f, 1f);
                 }
 
@@ -233,7 +233,7 @@ public class TerrainGenerator{
                     List<jMonkeyEngine.Road.Node> pathPoints =
                             road.getRoadPointsInChunk(terrain, 0, CHUNK_SIZE / 2,
                                                       CHUNK_SIZE - 1, CHUNK_SIZE / 2);
-                    updateHeightMap(terrain, chunk, pathPoints);
+                    updateHeightMap(terrain, pathPoints);
                 }
 
                 Mesh mesh = generateChunkMesh(terrain);

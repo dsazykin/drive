@@ -49,25 +49,86 @@ public class HeightMapGenerator {
     }
 
     public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath) {
-        for (Node roadPoint : roadPath) {
-            int x = roadPoint.x;
-            int z = roadPoint.y;
+        float roadWidth = 6f;
+        float halfWidth = roadWidth / 2f;
 
-            heightmap[x][z] = roadPoint.height + 2;
+        float[][] targetHeights = new float[heightmap.length][heightmap[0].length];
+        boolean[][] hasTarget = new boolean[heightmap.length][heightmap[0].length];
 
-            for (int i = -3; i <= 3; i++) {
-                for (int j = -3; j <= 3; j++) {
-                    if (x + i < 0 || z + j < 0 || x + i >= heightmap.length || z + j >= heightmap[0].length) continue;
-                    if (heightmap[x + i][z + j] >= 2) {
-                        heightmap[x + i][z + j] =
-                                (((heightmap[x + i][z + j] - 2) + roadPoint.height) / 2) + 2;
-                    } else {
-                        heightmap[x + i][z + j] = roadPoint.height + 2;
-                    }
+        float prevHeight = Float.MAX_VALUE;
+
+        for (int i = 0; i < roadPath.size() - 1; i++) {
+            Node a = roadPath.get(i);
+            Node b = roadPath.get(i + 1);
+
+            float dx = b.x - a.x;
+            float dz = b.y - a.y;
+            float segLength = (float) Math.sqrt(dx * dx + dz * dz);
+            dx /= segLength;
+            dz /= segLength;
+
+            float px = -dz;
+            float pz = dx;
+
+            for (float t = 0; t <= segLength; t += 0.5f) {
+                float cx = a.x + dx * t;
+                float cz = a.y + dz * t;
+
+                float lx = cx + px * halfWidth;
+                float lz = cz + pz * halfWidth;
+                float rx = cx - px * halfWidth;
+                float rz = cz - pz * halfWidth;
+
+                float count = 0;
+                float leftH = sampleHeight(heightmap, lx, lz);
+                if (leftH != 0) count++;
+                float rightH = sampleHeight(heightmap, rx, rz);
+                if (rightH != 0) count++;
+                float currHeight = (leftH + rightH) / count + 2;
+
+                if (i > 0 || t > 0) {
+                    currHeight = prevHeight * 0.7f + currHeight * 0.3f;
+                }
+
+                prevHeight = currHeight;
+                float targetHeight = currHeight;
+
+                for (float offset = -halfWidth; offset <= halfWidth; offset += 1f) {
+                    float ix = Math.round(cx + px * offset);
+                    float iz = Math.round(cz + pz * offset);
+
+                    int x = Math.round(ix);
+                    int z = Math.round(iz);
+                    if (x < 0 || z < 0 || x >= heightmap.length || z >= heightmap[0].length) continue;
+                    if (hasTarget[x][z]) continue;
+
+                    targetHeights[x][z] = targetHeight;
+                    hasTarget[x][z] = true;
                 }
             }
-
         }
+
+        for (int x = 0; x < heightmap.length; x++) {
+            for (int z = 0; z < heightmap[0].length; z++) {
+                if (hasTarget[x][z]) {
+                    heightmap[x][z] = targetHeights[x][z];
+                }
+            }
+        }
+    }
+
+    private float sampleHeight(float[][] map, float x, float z) {
+        int ix = Math.round(x);
+        int iz = Math.round(z);
+        if (ix < 0 || iz < 0 || ix >= map.length || iz >= map[0].length) return 0;
+        return map[ix][iz];
+    }
+
+    private void setHeight(float[][] map, float x, float z, float height) {
+        int ix = Math.round(x);
+        int iz = Math.round(z);
+        if (ix < 0 || iz < 0 || ix >= map.length || iz >= map[0].length) return;
+        map[ix][iz] = height;
     }
 
     public void generateImage(int chunkX, int chunkZ, float[][] heightmap) throws IOException {
@@ -115,15 +176,15 @@ public class HeightMapGenerator {
 
     public static void main(String[] args) throws IOException {
         Long seed = 946496062586794636L;
-        int chunkSize = 50;
+        int chunkSize = 500;
         float scale = 40;
         HeightMapGenerator generator = new HeightMapGenerator(seed, chunkSize, scale);
         RoadGenerator road = new RoadGenerator();
 
-        float[][] heightmap = generator.generateHeightmap(1, 0);
+        float[][] heightmap = generator.generateHeightmap(0, 0);
         List<Node> path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
         generator.applyRoadFlattening(heightmap, path);
-        generator.generateImage(1, 0, heightmap);
+        generator.generateImage(0, 0, heightmap);
 
 //        for (int i = 0; i < heightmap.length; i++) {
 //            for (int j = 0; j < heightmap[i].length; j++) {
