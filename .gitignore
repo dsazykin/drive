@@ -37,3 +37,4 @@ replay_pid*
 *.dll
 /generated_noise
 /drive-windows
+/jre-windows
