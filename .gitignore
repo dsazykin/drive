@@ -36,3 +36,4 @@ replay_pid*
 /drive.iml
 *.dll
 /generated_noise
+/drive-windows
