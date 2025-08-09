@@ -79,7 +79,7 @@ public class TerrainGenerator{
         heightMap.applyRoadFlattening(terrain, pathPoints);
     }
 
-    public Mesh generateChunkMesh(float[][] terrain){
+    public Mesh generateChunkMesh(float[][] terrain, int cx, int cz){
         Mesh mesh = new Mesh();
 
         Vector3f[] vertices = new Vector3f[CHUNK_SIZE * CHUNK_SIZE];
@@ -87,7 +87,7 @@ public class TerrainGenerator{
         int vertexIndex = 0;
         for (int z = 0; z < CHUNK_SIZE; z++) {
             for (int x = 0; x < CHUNK_SIZE; x++) {
-                float height = terrain[x][z];
+                float height = terrain[cx + x][cz + z];
 
                 ColorRGBA color;
                 if (height < 0.1f) {

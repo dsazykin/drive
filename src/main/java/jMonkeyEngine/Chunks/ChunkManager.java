@@ -12,6 +12,7 @@ import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import javax.xml.xpath.XPathEvaluationResult;
 
 public class ChunkManager {
     private final Node rootNode;
@@ -80,22 +81,25 @@ public class ChunkManager {
                             if (!generatedHeightmaps.containsKey(parent) && !loadingHeightmaps.contains(parent)) {
                                 loadingHeightmaps.add(parent);
                                 System.out.println("generating heightmap for: " + parent);
-                                generatedHeightmaps.put(parent, generator.generateHeightMap(parent));
-                                loadingHeightmaps.remove(parent);
-                                System.out.println("generated heightmap for: " + parent);
-                            }
-
-                            if (generatedChunks.containsKey(parent)) {
-                                chunkGeom = generatedChunks.get(parent).get(chunk);
-                            } else {
-                                float[][] terrain = generatedHeightmaps.get(parent);
-                                if (terrain == null) return;
+                                float[][] terrain = generator.generateHeightMap(parent);
                                 if (parent.z == 0 && parent.x == road.currentXChunk) {
                                     List<jMonkeyEngine.Road.Node> pathPoints =
                                             road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
                                                                       PARENT_SIZE - 1,
                                                                       PARENT_SIZE / 2);
                                     generator.updateHeightMap(terrain, pathPoints);
+                                }
+                                generatedHeightmaps.put(parent, terrain);
+                                loadingHeightmaps.remove(parent);
+                            }
+
+                            if (generatedChunks.containsKey(parent)) {
+                                chunkGeom = generatedChunks.get(parent).get(chunk);
+                            } else {
+                                float[][] terrain = generatedHeightmaps.get(parent);
+                                if (terrain == null) {
+                                    loadingChunks.remove(chunk);
+                                    return;
                                 }
                                 generatedChunks.put(parent, splitIntoChildren(terrain, parent));
                                 chunkGeom = generatedChunks.get(parent).get(chunk);
@@ -141,30 +145,16 @@ public class ChunkManager {
 
         for (int cz = 0; cz < PARENT_SIZE; cz += CHUNK_SIZE) {
             for (int cx = 0; cx < PARENT_SIZE; cx += CHUNK_SIZE) {
-                float[][] childHeightmap = extractChildHeightmap(parentHeightmap, cx, cz);
-                Mesh mesh = generator.generateChunkMesh(childHeightmap);
+                Mesh mesh = generator.generateChunkMesh(parentHeightmap, cx, cz);
                 ChunkCoord childCoord = new ChunkCoord(
                         parentCoord.x * (PARENT_SIZE / CHUNK_SIZE) + (cx / CHUNK_SIZE),
                         parentCoord.z * (PARENT_SIZE / CHUNK_SIZE) + (cz / CHUNK_SIZE)
                 );
                 Geometry geom = generator.createGeometry(childCoord, mesh);
                 children.put(childCoord, geom);
-                System.out.println("generated mesh for child: " + childCoord);
             }
         }
         return children;
-    }
-
-    private float[][] extractChildHeightmap(float[][] parent, int cx, int cz) {
-        float[][] child = new float[CHUNK_SIZE][CHUNK_SIZE];
-
-        for (int x = 0; x < CHUNK_SIZE; x++) {
-            for (int z = 0; z < CHUNK_SIZE; z++) {
-                child[x][z] = parent[cx + x][cz + z];
-            }
-        }
-
-        return child;
     }
 
 }
