@@ -25,6 +25,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -41,6 +42,7 @@ public class TerrainGenerator{
     private final ExecutorService executor;
 
     private final int CHUNK_SIZE;
+    private final int PARENT_SIZE;
     private final float SCALE;
     private final Long SEED;
     private final int MAX_HEIGHT;
@@ -49,7 +51,7 @@ public class TerrainGenerator{
 
     public TerrainGenerator(BulletAppState bulletAppState,
                             Node rootNode, AssetManager assetManager, RoadGenerator road, SimpleApplication main,
-                            ExecutorService executor, int chunkSize, float SCALE, Long seed,
+                            ExecutorService executor, int chunkSize, int parentSize, float SCALE, Long seed,
                             int maxHeight) {
         this.bulletAppState = bulletAppState;
         this.rootNode = rootNode;
@@ -58,10 +60,11 @@ public class TerrainGenerator{
         this.main = main;
         this.executor = executor;
         this.CHUNK_SIZE = chunkSize;
+        this.PARENT_SIZE = parentSize;
         this.SCALE = SCALE;
         this.SEED = seed;
         MAX_HEIGHT = maxHeight;
-        this.heightMap = new HeightMapGenerator(SEED, CHUNK_SIZE, SCALE);
+        this.heightMap = new HeightMapGenerator(SEED, PARENT_SIZE, SCALE);
     }
 
     public void setChunkManager(ChunkManager manager) {
@@ -229,20 +232,21 @@ public class TerrainGenerator{
 
             try {
                 float[][] terrain = generateHeightMap(chunk);
-                if (chunk.z == 0) {
-                    List<jMonkeyEngine.Road.Node> pathPoints =
-                            road.getRoadPointsInChunk(terrain, 0, CHUNK_SIZE / 2,
-                                                      CHUNK_SIZE - 1, CHUNK_SIZE / 2);
-                    updateHeightMap(terrain, pathPoints);
-                }
+                List<jMonkeyEngine.Road.Node> pathPoints =
+                        road.getRoadPointsInChunk(terrain, 0, PARENT_SIZE / 2, PARENT_SIZE - 1,
+                                                  PARENT_SIZE / 2);
+                updateHeightMap(terrain, pathPoints);
 
-                Mesh mesh = generateChunkMesh(terrain);
-                Geometry chunkGeom = createGeometry(chunk, mesh);
+                HashMap<ChunkCoord, Geometry> children = manager.splitIntoChildren(terrain, chunk);
+                manager.addChunk(chunk, children, terrain);
 
                 main.enqueue(() -> {
-                    manager.addChunk(chunk, chunkGeom);
-                    rootNode.attachChild(chunkGeom);
-                    bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
+                    Geometry chunkGeom;
+                    for (ChunkCoord child : children.keySet()) {
+                        chunkGeom = children.get(child);
+                        rootNode.attachChild(chunkGeom);
+                        bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
+                    }
 
                     return null;
                 });

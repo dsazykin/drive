@@ -89,10 +89,10 @@ public class Main extends SimpleApplication
 
         road = new RoadGenerator();
         generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, road, this, executor,
-                                         CHUNK_SIZE, SCALE, SEED, 200);
+                                         200, CHUNK_SIZE, SCALE, SEED, 200);
         this.manager =
-                new ChunkManager(bulletAppState, rootNode, road, generator, this, executor, CHUNK_SIZE,
-                                 SCALE, 1);
+                new ChunkManager(bulletAppState, rootNode, road, generator, this, executor,
+                                 200, CHUNK_SIZE, SCALE, 2);
         generator.setChunkManager(manager);
 
         float zSpawn = (CHUNK_SIZE / 2) * (SCALE / 16);
