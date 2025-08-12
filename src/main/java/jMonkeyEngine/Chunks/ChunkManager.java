@@ -166,6 +166,6 @@ public class ChunkManager {
 
     public float getSpawnHeight(int MAX_HEIGHT) {
         float[][] spawnChunk = generatedHeightmaps.get(new ChunkCoord(0,0));
-        return spawnChunk[0][CHUNK_SIZE / 2] * MAX_HEIGHT;
+        return (spawnChunk[0][PARENT_SIZE / 2] - 2) * MAX_HEIGHT;
     }
 }
