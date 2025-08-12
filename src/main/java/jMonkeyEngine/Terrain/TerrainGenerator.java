@@ -263,15 +263,4 @@ public class TerrainGenerator{
     public List<Future<?>> getChunkTasks() {
         return chunkTasks;
     }
-
-    public float getSpawnHeight() {
-        float[][] spawnChunk = null;
-        try {
-            spawnChunk =
-                    generateHeightMap(new ChunkCoord(0, 0));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return spawnChunk[0][CHUNK_SIZE / 2] * MAX_HEIGHT;
-    }
 }

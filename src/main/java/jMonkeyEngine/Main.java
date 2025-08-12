@@ -95,14 +95,17 @@ public class Main extends SimpleApplication
                                  200, CHUNK_SIZE, SCALE, 2);
         generator.setChunkManager(manager);
 
-        float zSpawn = (CHUNK_SIZE / 2) * (SCALE / 16);
-        resetPoint = new Vector3f(5f, generator.getSpawnHeight() + 1f, zSpawn);
-
         guiGroupNode = new Node("guiGroupNode");
 
         setUpKeys();
         setUpLight();
         loadScene();
+
+        float zSpawn = (CHUNK_SIZE / 2) * (SCALE / 16);
+        System.out.println(zSpawn);
+        System.out.println(manager.getSpawnHeight(200));
+        resetPoint = new Vector3f(5f, manager.getSpawnHeight(200) + 1f, zSpawn);
+
         initCar();
         loadGUI();
         initPauseMenu();

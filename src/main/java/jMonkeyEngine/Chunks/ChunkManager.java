@@ -9,6 +9,7 @@ import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -163,4 +164,8 @@ public class ChunkManager {
         return generator.createGeometry(childCoord, mesh);
     }
 
+    public float getSpawnHeight(int MAX_HEIGHT) {
+        float[][] spawnChunk = generatedHeightmaps.get(new ChunkCoord(0,0));
+        return spawnChunk[0][CHUNK_SIZE / 2] * MAX_HEIGHT;
+    }
 }
