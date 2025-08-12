@@ -13,20 +13,14 @@ import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import com.jme3.scene.VertexBuffer;
-import com.jme3.texture.Image;
-import com.jme3.texture.Texture2D;
-import com.jme3.texture.plugins.AWTLoader;
 import com.jme3.util.BufferUtils;
-import com.jme3.util.TangentBinormalGenerator;
 import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Road.RoadGenerator;
-import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
@@ -237,11 +231,21 @@ public class TerrainGenerator{
                                                   PARENT_SIZE / 2);
                 updateHeightMap(terrain, pathPoints);
 
-                HashMap<ChunkCoord, Geometry> children = manager.splitIntoChildren(terrain, chunk);
+                ConcurrentHashMap<ChunkCoord, Geometry> children = new ConcurrentHashMap<>();
+                ChunkCoord childCoord;
+
+                for (int x = 0; x < PARENT_SIZE / CHUNK_SIZE; x++) {
+                    for (int z = 0; z < PARENT_SIZE / CHUNK_SIZE; z++) {
+                        childCoord = new ChunkCoord(x, z);
+                        children.put(childCoord, manager.getChild(terrain, chunk, childCoord));
+                    }
+                }
+
                 manager.addChunk(chunk, children, terrain);
 
                 main.enqueue(() -> {
                     Geometry chunkGeom;
+
                     for (ChunkCoord child : children.keySet()) {
                         chunkGeom = children.get(child);
                         rootNode.attachChild(chunkGeom);

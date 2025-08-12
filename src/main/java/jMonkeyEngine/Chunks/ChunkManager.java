@@ -12,7 +12,6 @@ import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import javax.xml.xpath.XPathEvaluationResult;
 
 public class ChunkManager {
     private final Node rootNode;
@@ -30,7 +29,7 @@ public class ChunkManager {
     Set<ChunkCoord> loadingChunks = ConcurrentHashMap.newKeySet();
     Set<ChunkCoord> loadingHeightmaps = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<ChunkCoord, Geometry> loadedChunks = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<ChunkCoord, HashMap<ChunkCoord, Geometry>> generatedChunks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ChunkCoord, ConcurrentHashMap<ChunkCoord, Geometry>> generatedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, float[][]> generatedHeightmaps = new ConcurrentHashMap<>();
 
     public ChunkManager(BulletAppState bulletAppState, Node rootNode, RoadGenerator road,
@@ -48,7 +47,7 @@ public class ChunkManager {
         this.RENDER_DISTANCE = renderDistance;
     }
 
-    public void addChunk(ChunkCoord thisChunk, HashMap<ChunkCoord, Geometry> children, float[][] heightmap) {
+    public void addChunk(ChunkCoord thisChunk, ConcurrentHashMap<ChunkCoord, Geometry> children, float[][] heightmap) {
         for (ChunkCoord chunk : children.keySet()) {
             loadedChunks.put(chunk, children.get(chunk));
         }
@@ -80,7 +79,6 @@ public class ChunkManager {
 
                             if (!generatedHeightmaps.containsKey(parent) && !loadingHeightmaps.contains(parent)) {
                                 loadingHeightmaps.add(parent);
-                                System.out.println("generating heightmap for: " + parent);
                                 float[][] terrain = generator.generateHeightMap(parent);
                                 if (parent.z == 0 && parent.x == road.currentXChunk) {
                                     List<jMonkeyEngine.Road.Node> pathPoints =
@@ -93,16 +91,28 @@ public class ChunkManager {
                                 loadingHeightmaps.remove(parent);
                             }
 
+                            ConcurrentHashMap<ChunkCoord, Geometry> children = new ConcurrentHashMap<>();
                             if (generatedChunks.containsKey(parent)) {
-                                chunkGeom = generatedChunks.get(parent).get(chunk);
+                                children = generatedChunks.get(parent);
+                            }
+
+                            if (children.containsKey(chunk)) {
+                                chunkGeom = children.get(chunk);
                             } else {
                                 float[][] terrain = generatedHeightmaps.get(parent);
                                 if (terrain == null) {
                                     loadingChunks.remove(chunk);
                                     return;
                                 }
-                                generatedChunks.put(parent, splitIntoChildren(terrain, parent));
-                                chunkGeom = generatedChunks.get(parent).get(chunk);
+                                chunkGeom = getChild(terrain, parent, chunk);
+
+                                if (generatedChunks.containsKey(parent)) {
+                                    generatedChunks.get(parent).put(chunk, chunkGeom);
+                                } else {
+                                    children.put(chunk, chunkGeom);
+                                    generatedChunks.put(parent, children);
+                                }
+
                             }
 
                             loadedChunks.put(chunk, chunkGeom);
@@ -110,7 +120,8 @@ public class ChunkManager {
 
                             main.enqueue(() -> {
                                 rootNode.attachChild(chunkGeom);
-                                bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
+                                bulletAppState.getPhysicsSpace().add(
+                                        chunkGeom.getControl(RigidBodyControl.class));
 
                             });
                         } catch (Exception e) {
@@ -140,21 +151,16 @@ public class ChunkManager {
         return new ChunkCoord(parentX, parentZ);
     }
 
-    public HashMap<ChunkCoord, Geometry> splitIntoChildren(float[][] parentHeightmap, ChunkCoord parentCoord) {
-        HashMap<ChunkCoord, Geometry> children = new HashMap<>();
+    public Geometry getChild(float[][] parentHeightmap, ChunkCoord parentCoord, ChunkCoord childCoord) {
+        int localChildX = childCoord.x - parentCoord.x * (PARENT_SIZE / CHUNK_SIZE);
+        int localChildZ = childCoord.z - parentCoord.z * (PARENT_SIZE / CHUNK_SIZE);
 
-        for (int cz = 0; cz < PARENT_SIZE; cz += CHUNK_SIZE) {
-            for (int cx = 0; cx < PARENT_SIZE; cx += CHUNK_SIZE) {
-                Mesh mesh = generator.generateChunkMesh(parentHeightmap, cx, cz);
-                ChunkCoord childCoord = new ChunkCoord(
-                        parentCoord.x * (PARENT_SIZE / CHUNK_SIZE) + (cx / CHUNK_SIZE),
-                        parentCoord.z * (PARENT_SIZE / CHUNK_SIZE) + (cz / CHUNK_SIZE)
-                );
-                Geometry geom = generator.createGeometry(childCoord, mesh);
-                children.put(childCoord, geom);
-            }
-        }
-        return children;
+        int cx = localChildX * CHUNK_SIZE;
+        int cz = localChildZ * CHUNK_SIZE;
+
+        Mesh mesh = generator.generateChunkMesh(parentHeightmap, cx, cz);
+
+        return generator.createGeometry(childCoord, mesh);
     }
 
 }

@@ -416,9 +416,9 @@ public class Main extends SimpleApplication
         rearLeftText.setText(String.format("RL: %.1f", control.getWheel(2).getFrictionSlip()));
         rearRightText.setText(String.format("RR: %.1f", control.getWheel(3).getFrictionSlip()));
         chunkX.setText(String.format("X Coord: %.1f",
-                                     Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
+                                     Math.floor(cam.getLocation().x / ((200 - 1) * (SCALE / 16)))));
         chunkZ.setText(String.format("Z Coord: %.1f",
-                                     Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
+                                     Math.floor(cam.getLocation().z / ((200 - 1) * (SCALE / 16)))));
     }
 
     @Override
