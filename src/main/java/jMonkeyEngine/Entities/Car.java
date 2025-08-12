@@ -40,7 +40,7 @@ public class Car {
         float compValue = 0.2f;
         float dampValue = 0.3f;
 
-        carNode = (Node) assetManager.loadModel("Models/Car/Car.scene");
+        carNode = (Node) assetManager.loadModel("Models/SportsCar/Car.scene");
         carNode.setShadowMode(RenderQueue.ShadowMode.Cast);
         Geometry chassis = findGeom(carNode, "Car");
 
