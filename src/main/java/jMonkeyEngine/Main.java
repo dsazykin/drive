@@ -3,7 +3,6 @@ package jMonkeyEngine;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.VehicleControl;
-import com.jme3.font.BitmapFont;
 import com.jme3.font.BitmapText;
 import com.jme3.input.KeyInput;
 import com.jme3.input.controls.ActionListener;
@@ -15,7 +14,8 @@ import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.system.AppSettings;
 import jMonkeyEngine.Chunks.ChunkManager;
-import jMonkeyEngine.Entities.Car;
+import jMonkeyEngine.Entities.Gtr;
+import jMonkeyEngine.Entities.SportsCar;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.concurrent.ExecutorService;
@@ -32,7 +32,7 @@ public class Main extends SimpleApplication
     ChunkManager manager;
     RoadGenerator road;
 
-    private Car car;
+    private Gtr sportsCar;
     private Vector3f resetPoint;
 
     private Node guiGroupNode;
@@ -229,20 +229,20 @@ public class Main extends SimpleApplication
     }
 
     private void initCar() {
-        car = new Car(assetManager, bulletAppState.getPhysicsSpace());
+        sportsCar = new Gtr(assetManager, bulletAppState.getPhysicsSpace());
         // Set desired spawn location
         Quaternion rotation = new Quaternion();
         rotation.fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y);
 
         // Apply to the physics control (VehicleControl or similar)
-        car.getControl().setPhysicsLocation(resetPoint);
-        car.getControl().setPhysicsRotation(rotation);
+        sportsCar.getControl().setPhysicsLocation(resetPoint);
+        sportsCar.getControl().setPhysicsRotation(rotation);
 
         // Optionally also apply to the visual node (if needed)
-        car.getCarNode().setLocalTranslation(resetPoint);
-        car.getCarNode().rotate(rotation);
+        sportsCar.getCarNode().setLocalTranslation(resetPoint);
+        sportsCar.getCarNode().rotate(rotation);
 
-        rootNode.attachChild(car.getCarNode());
+        rootNode.attachChild(sportsCar.getCarNode());
     }
 
     private void setUpLight() {
@@ -292,20 +292,20 @@ public class Main extends SimpleApplication
     public void onAction(String binding, boolean value, float tpf) {
         if (binding.equals("Left")) {
             if (value) {
-                car.setTargetSteeringValue(1f);
+                sportsCar.setTargetSteeringValue(1f);
             } else {
-                car.setTargetSteeringValue(0f);
+                sportsCar.setTargetSteeringValue(0f);
             }
         } else if (binding.equals("Right")) {
             if (value) {
-                car.setTargetSteeringValue(-1f);
+                sportsCar.setTargetSteeringValue(-1f);
             } else {
-                car.setTargetSteeringValue(0f);
+                sportsCar.setTargetSteeringValue(0f);
             }
         } else if (binding.equals("Accelerate")) {
-            car.setAccelerating(value);
+            sportsCar.setAccelerating(value);
         } else if (binding.equals("Break")) {
-            car.setBreaking(value);
+            sportsCar.setBreaking(value);
         }
 
         if (binding.equals("Cam") && !value) {
@@ -313,14 +313,14 @@ public class Main extends SimpleApplication
         }
 
         if (binding.equals("Reset") && !value) {
-            VehicleControl control = car.getControl();
+            VehicleControl control = sportsCar.getControl();
             control.setLinearVelocity(new Vector3f(0,0,0));
             control.setAngularVelocity(new Vector3f(0,0,0));
-            car.getControl().setPhysicsLocation(resetPoint);
-            car.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
+            sportsCar.getControl().setPhysicsLocation(resetPoint);
+            sportsCar.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
 
-            car.getCarNode().setLocalTranslation(resetPoint);
-            car.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
+            sportsCar.getCarNode().setLocalTranslation(resetPoint);
+            sportsCar.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
         }
 
         if (binding.equals("GUI") && !value) {
@@ -374,16 +374,16 @@ public class Main extends SimpleApplication
                 });
             }
         } else {
-            VehicleControl control = car.getControl();
+            VehicleControl control = sportsCar.getControl();
             manager.updateChunks(cam.getLocation());
 
             // 1. Get current speed
-            float speed = -control.getCurrentVehicleSpeedKmHour();
+            float speed = control.getCurrentVehicleSpeedKmHour();
             float velocity = speed / 3.6f;
 
-            car.weightTransfer(velocity, speed);
-            car.move(velocity, speed);
-            car.steer(speed, tpf);
+            sportsCar.weightTransfer(velocity, speed);
+            sportsCar.move(velocity, speed);
+            sportsCar.steer(speed, tpf);
 
             if (followCam) {
                 followCam(tpf, control);
@@ -401,7 +401,7 @@ public class Main extends SimpleApplication
 
         // === SMOOTH CAMERA FOLLOW ===
         Vector3f targetCamPos =
-                control.getPhysicsLocation().add(forward.negate().mult(-10f)) // 20 units behind
+                control.getPhysicsLocation().add(forward.negate().mult(10f)) // 20 units behind
                         .add(0, 4f, 0);
 
         // Interpolate camera position
