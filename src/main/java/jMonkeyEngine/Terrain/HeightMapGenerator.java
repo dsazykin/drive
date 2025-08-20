@@ -87,7 +87,7 @@ public class HeightMapGenerator {
                 float currHeight = (leftH + rightH) / count + 2;
 
                 if (prevHeight != Float.MAX_VALUE) {
-                    currHeight = prevHeight * 0.95f + currHeight * 0.05f;
+                    currHeight = prevHeight * 0.98f + currHeight * 0.02f;
                 }
 
                 prevHeight = currHeight;
