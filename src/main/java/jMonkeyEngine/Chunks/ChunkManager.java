@@ -32,6 +32,8 @@ public class ChunkManager {
     private final ConcurrentHashMap<ChunkCoord, Geometry> loadedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, ConcurrentHashMap<ChunkCoord, Geometry>> generatedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, float[][]> generatedHeightmaps = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>> generatedRoads =
+            new ConcurrentHashMap<>();
 
     public ChunkManager(BulletAppState bulletAppState, Node rootNode, RoadGenerator road,
                         TerrainGenerator generator, SimpleApplication main, ExecutorService executor,
@@ -48,12 +50,14 @@ public class ChunkManager {
         this.RENDER_DISTANCE = renderDistance;
     }
 
-    public void addChunk(ChunkCoord thisChunk, ConcurrentHashMap<ChunkCoord, Geometry> children, float[][] heightmap) {
+    public void addChunk(ChunkCoord thisChunk, ConcurrentHashMap<ChunkCoord, Geometry> children,
+                         float[][] heightmap, List<jMonkeyEngine.Road.Node> nodes) {
         for (ChunkCoord chunk : children.keySet()) {
             loadedChunks.put(chunk, children.get(chunk));
         }
         generatedChunks.put(thisChunk, children);
         generatedHeightmaps.put(thisChunk, heightmap);
+        generatedRoads.put(thisChunk, nodes);
     }
 
     public void updateChunks(Vector3f playerPos) {
@@ -87,6 +91,7 @@ public class ChunkManager {
                                                                       PARENT_SIZE - 1,
                                                                       PARENT_SIZE / 2);
                                     generator.updateHeightMap(terrain, pathPoints);
+                                    generatedRoads.put(parent, pathPoints);
                                 }
                                 generatedHeightmaps.put(parent, terrain);
                                 loadingHeightmaps.remove(parent);
@@ -167,5 +172,14 @@ public class ChunkManager {
     public float getSpawnHeight(int MAX_HEIGHT) {
         float[][] spawnChunk = generatedHeightmaps.get(new ChunkCoord(0,0));
         return (spawnChunk[0][PARENT_SIZE / 2] - 2) * MAX_HEIGHT;
+    }
+
+    public Vector3f getCamDirection(float height) {
+        List<jMonkeyEngine.Road.Node> nodes = generatedRoads.get(new ChunkCoord(0, 0));
+        jMonkeyEngine.Road.Node point = nodes.get(40);
+        System.out.println(point.x * (SCALE / 16));
+        System.out.println(point.y * (SCALE / 16));
+        return new Vector3f(point.x * (SCALE / 16), height - 15,
+                            point.y * (SCALE / 16));
     }
 }

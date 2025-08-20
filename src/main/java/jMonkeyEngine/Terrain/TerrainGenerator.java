@@ -241,7 +241,7 @@ public class TerrainGenerator{
                     }
                 }
 
-                manager.addChunk(chunk, children, terrain);
+                manager.addChunk(chunk, children, terrain, pathPoints);
 
                 main.enqueue(() -> {
                     Geometry chunkGeom;

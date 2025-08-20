@@ -1,10 +1,8 @@
 package jMonkeyEngine;
 
 import com.jme3.app.Application;
-import com.jme3.app.FlyCamAppState;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
-import com.jme3.app.state.RootNodeAppState;
 import com.jme3.asset.AssetManager;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.VehicleControl;
@@ -30,7 +28,6 @@ import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 public class GameplayState extends BaseAppState implements ActionListener {
 
@@ -54,24 +51,27 @@ public class GameplayState extends BaseAppState implements ActionListener {
     private Gtr sportsCar;
     private Vector3f resetPoint;
 
-    private Node guiGroupNode;
+    private Node gameplayRoot;
+    private Node hud;
+
     private BitmapText speedText;
     private BitmapText frontLeftText;
     private BitmapText frontRightText;
     private BitmapText rearLeftText;
     private BitmapText rearRightText;
-    private BitmapText loadingText;
     private BitmapText chunkX;
     private BitmapText chunkZ;
     private BitmapText pauseText;
+    private BitmapText startText;
 
     private boolean loadingDone = false;
     private boolean isPaused = false;
     private Node pauseMenuNode;
     public boolean guiLoaded = false;
+    private boolean started = false;
 
     private Vector3f cameraPos = new Vector3f();
-    private boolean followCam = true;
+    private boolean followCam = false;
     private boolean gui = false;
 
     private final int CHUNK_SIZE = 1000;
@@ -88,7 +88,13 @@ public class GameplayState extends BaseAppState implements ActionListener {
         assetManager = sapp.getAssetManager();
         flyCam = sapp.getFlyByCamera();
         cam = sapp.getCamera();
+
         guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
+
+        gameplayRoot = new Node("Gameplay Root");
+        hud = new Node("hud");
+
+        rootNode.attachChild(gameplayRoot);
 
         executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
@@ -99,40 +105,48 @@ public class GameplayState extends BaseAppState implements ActionListener {
         enablePlayerControls(false);
 
         flyCam.setEnabled(true);
-        flyCam.setMoveSpeed(300);
+        flyCam.setMoveSpeed(0);
 
         bulletAppState = new BulletAppState();
         sapp.getStateManager().attach(bulletAppState);
+        bulletAppState.setEnabled(false);
 
         road = new RoadGenerator();
-        generator = new TerrainGenerator(bulletAppState, rootNode, assetManager, road, sapp, executor,
+        generator = new TerrainGenerator(bulletAppState, gameplayRoot, assetManager, road, sapp, executor,
                                          200, CHUNK_SIZE, SCALE, SEED, 200);
         this.manager =
-                new ChunkManager(bulletAppState, rootNode, road, generator, sapp, executor,
+                new ChunkManager(bulletAppState, gameplayRoot, road, generator, sapp, executor,
                                  200, CHUNK_SIZE, SCALE, 2);
         generator.setChunkManager(manager);
 
-        guiGroupNode = new Node("guiGroupNode");
+        loadScene();
+        System.out.println("loaded terrain");
+
+        float zSpawn = (CHUNK_SIZE / 2) * (SCALE / 16);
+        float spawnHeight = manager.getSpawnHeight(200);
+        System.out.println(zSpawn);
+        System.out.println(spawnHeight);
+        resetPoint = new Vector3f(5f, spawnHeight + 1f, zSpawn);
+        System.out.println("got reset point");
+
+        cam.setLocation(new Vector3f(5f, spawnHeight + 20, zSpawn));
+        cam.lookAt(manager.getCamDirection(spawnHeight), Vector3f.UNIT_Y);
 
         setUpKeys();
         System.out.println("set up keys");
         setUpLight();
         System.out.println("set up light");
-        loadScene();
-        System.out.println("loaded terrain");
-
-        float zSpawn = (CHUNK_SIZE / 2) * (SCALE / 16);
-        System.out.println(zSpawn);
-        System.out.println(manager.getSpawnHeight(200));
-        resetPoint = new Vector3f(5f, manager.getSpawnHeight(200) + 1f, zSpawn);
-        System.out.println("got reset point");
 
         loadGUI();
         System.out.println("loaded gui");
         initPauseMenu();
         System.out.println("loaded pause menu");
+        
         initCar();
         System.out.println("loaded car");
+
+        loadingDone = true;
+        enablePlayerControls(true);
     }
 
     @Override
@@ -147,27 +161,33 @@ public class GameplayState extends BaseAppState implements ActionListener {
 
     @Override
     protected void cleanup(Application app) {
-        // Cleanup resources when the state is destroyed
-        executor.shutdownNow();
+        if (gameplayRoot != null) {
+            gameplayRoot.removeFromParent();
+            gameplayRoot = null;
+        }
+
+        if (hud != null) {
+            hud.removeFromParent();
+            hud = null;
+        }
+
+        if (bulletAppState != null) {
+            getStateManager().detach(bulletAppState);
+            bulletAppState = null;
+        }
+
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdownNow();
+        }
     }
 
     @Override
     public void update(float tpf) {
         super.update(tpf);
 
-        if (!loadingDone && generator.getChunkTasks() != null) {
-            boolean allDone = generator.getChunkTasks().stream().allMatch(Future::isDone);
-            if (allDone) {
-                loadingDone = true;
-                sapp.enqueue(() -> {
-                    sapp.enqueue(() -> guiNode.detachChild(loadingText));
-                    enablePlayerControls(true);
-                    return null;
-                });
-            }
-        } else {
+        if (loadingDone) {
             VehicleControl control = sportsCar.getControl();
-            manager.updateChunks(cam.getLocation());
+            manager.updateChunks(sportsCar.getCarNode().getWorldTranslation());
 
             // 1. Get current speed
             float speed = control.getCurrentVehicleSpeedKmHour();
@@ -210,6 +230,12 @@ public class GameplayState extends BaseAppState implements ActionListener {
 
         if (binding.equals("Cam") && !value) {
             followCam = !followCam;
+            if (!started) {
+                started = true;
+                guiNode.detachChild(startText);
+                flyCam.setMoveSpeed(300);
+                bulletAppState.setEnabled(true);
+            }
         }
 
         if (binding.equals("Reset") && !value) {
@@ -226,9 +252,9 @@ public class GameplayState extends BaseAppState implements ActionListener {
         if (binding.equals("GUI") && !value) {
             gui = !gui;
             if (gui) {
-                guiNode.attachChild(guiGroupNode);
+                guiNode.attachChild(hud);
             } else {
-                guiNode.detachChild(guiGroupNode);
+                guiNode.detachChild(hud);
             }
         }
 
@@ -246,11 +272,12 @@ public class GameplayState extends BaseAppState implements ActionListener {
     }
 
     private void loadGUI() {
-        loadingText = new BitmapText(guiFont, false);
-        loadingText.setSize(guiFont.getCharSet().getRenderedSize());
-        loadingText.setText("Loading terrain...");
-        loadingText.setLocalTranslation(300, 300, 0);
-        guiNode.attachChild(loadingText);
+        startText = new BitmapText(guiFont, false);
+        startText.setSize(guiFont.getCharSet().getRenderedSize());
+        startText.setText("Press 'C' to start");
+        startText.setLocalTranslation(((float) cam.getWidth() / 2) - (startText.getLineWidth() / 2),
+                                      (float) cam.getHeight() / 2, 0);
+        guiNode.attachChild(startText);
 
         speedText = new BitmapText(guiFont, false);
         speedText.setSize(guiFont.getCharSet().getRenderedSize());
@@ -260,75 +287,75 @@ public class GameplayState extends BaseAppState implements ActionListener {
         frontLeftText = new BitmapText(guiFont, false);
         frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
         frontLeftText.setLocalTranslation(10, cam.getHeight() - 50, 0);
-        guiGroupNode.attachChild(frontLeftText);
+        hud.attachChild(frontLeftText);
 
         frontRightText = new BitmapText(guiFont, false);
         frontRightText.setSize(guiFont.getCharSet().getRenderedSize());
         frontRightText.setLocalTranslation(130, cam.getHeight() - 50, 0);
-        guiGroupNode.attachChild(frontRightText);
+        hud.attachChild(frontRightText);
 
         rearLeftText = new BitmapText(guiFont, false);
         rearLeftText.setSize(guiFont.getCharSet().getRenderedSize());
         rearLeftText.setLocalTranslation(10, cam.getHeight() - 70, 0);
-        guiGroupNode.attachChild(rearLeftText);
+        hud.attachChild(rearLeftText);
 
         rearRightText = new BitmapText(guiFont, false);
         rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
-        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0); // top-left corner
-        guiGroupNode.attachChild(rearRightText);
+        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0);
+        hud.attachChild(rearRightText);
 
         chunkX = new BitmapText(guiFont, false);
         chunkX.setSize(guiFont.getCharSet().getRenderedSize());
         chunkX.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 10, 0);
-        guiGroupNode.attachChild(chunkX);
+        hud.attachChild(chunkX);
 
         chunkZ = new BitmapText(guiFont, false);
         chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
         chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
-        guiGroupNode.attachChild(chunkZ);
+        hud.attachChild(chunkZ);
 
         guiLoaded = true;
     }
 
     public void reloadGUI() {
-        guiGroupNode.detachAllChildren();
+        hud.detachAllChildren();
         pauseMenuNode.detachAllChildren();
-        guiNode.detachChild(speedText);
+        hud.detachChild(speedText);
 
         speedText = new BitmapText(guiFont, false);
         speedText.setSize(guiFont.getCharSet().getRenderedSize());
         speedText.setLocalTranslation(10, cam.getHeight() - 10, 0);
-        guiNode.attachChild(speedText);
+        hud.attachChild(speedText);
 
         frontLeftText = new BitmapText(guiFont, false);
         frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
         frontLeftText.setLocalTranslation(10, cam.getHeight() - 50, 0);
-        guiGroupNode.attachChild(frontLeftText);
+        hud.attachChild(frontLeftText);
 
         frontRightText = new BitmapText(guiFont, false);
         frontRightText.setSize(guiFont.getCharSet().getRenderedSize());
         frontRightText.setLocalTranslation(130, cam.getHeight() - 50, 0);
-        guiGroupNode.attachChild(frontRightText);
+        hud.attachChild(frontRightText);
 
         rearLeftText = new BitmapText(guiFont, false);
         rearLeftText.setSize(guiFont.getCharSet().getRenderedSize());
         rearLeftText.setLocalTranslation(10, cam.getHeight() - 70, 0);
-        guiGroupNode.attachChild(rearLeftText);
+        hud.attachChild(rearLeftText);
 
         rearRightText = new BitmapText(guiFont, false);
         rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
         rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0);
-        guiGroupNode.attachChild(rearRightText);
+        hud.attachChild(rearRightText);
 
         chunkX = new BitmapText(guiFont, false);
         chunkX.setSize(guiFont.getCharSet().getRenderedSize());
         chunkX.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 10, 0);
-        guiGroupNode.attachChild(chunkX);
+        hud.attachChild(chunkX);
 
         chunkZ = new BitmapText(guiFont, false);
         chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
         chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
-        guiGroupNode.attachChild(chunkZ);
+        hud.attachChild(chunkZ);
 
         pauseText = new BitmapText(guiFont);
         pauseText.setText("Game Paused\nPress ESC to Resume\nPress Q to Quit");
@@ -366,19 +393,19 @@ public class GameplayState extends BaseAppState implements ActionListener {
         sportsCar.getCarNode().setLocalTranslation(resetPoint);
         sportsCar.getCarNode().rotate(rotation);
 
-        sapp.getRootNode().attachChild(sportsCar.getCarNode());
+        gameplayRoot.attachChild(sportsCar.getCarNode());
     }
 
     private void setUpLight() {
         // We add light so we see the scene
         AmbientLight al = new AmbientLight();
         al.setColor(ColorRGBA.White.mult(0.5f));
-        rootNode.addLight(al);
+        gameplayRoot.addLight(al);
 
         DirectionalLight dl = new DirectionalLight();
         dl.setColor(ColorRGBA.White);
         dl.setDirection(new Vector3f(2.8f, -2.8f, -2.8f).normalizeLocal());
-        rootNode.addLight(dl);
+        gameplayRoot.addLight(dl);
     }
 
     private void setUpKeys() {

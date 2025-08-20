@@ -60,8 +60,11 @@ public class MainMenuState extends BaseAppState {
 
     @Override
     protected void cleanup(Application app) {
-        // Remove menu when this state is detached
         ((SimpleApplication) app).getGuiNode().detachChild(menu);
+        if (menu != null) {
+            menu.removeFromParent();
+            menu = null;
+        }
     }
 
     @Override
