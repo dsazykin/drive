@@ -1,18 +1,26 @@
 package jMonkeyEngine.Entities;
 
+import com.jme3.app.SimpleApplication;
 import com.jme3.asset.AssetManager;
 import com.jme3.asset.AssetNotFoundException;
 import com.jme3.bounding.BoundingBox;
 import com.jme3.bullet.PhysicsSpace;
 import com.jme3.bullet.collision.shapes.CollisionShape;
 import com.jme3.bullet.control.VehicleControl;
+import com.jme3.bullet.objects.VehicleWheel;
 import com.jme3.bullet.util.CollisionShapeFactory;
+import com.jme3.material.Material;
+import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
 import com.jme3.math.Vector3f;
 import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
+import com.jme3.scene.debug.Arrow;
+import jMonkeyEngine.Main;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Gtr {
     private final VehicleControl control;
@@ -38,63 +46,11 @@ public class Gtr {
     private boolean breaking = false;
 
     public Gtr(AssetManager assetManager, PhysicsSpace physicsSpace) {
-        float stiffness = 120.0f;
-        float compValue = 0.2f;
-        float dampValue = 0.3f;
-
         car = new Nismo();
         car.load(assetManager);
 
         carNode = car.getNode();
         control = car.getVehicleControl();
-
-//        // Load the car visual model
-//        carNode = (Node) assetManager.loadModel("Models/gtr_nismo/scene.gltf.j3o");
-//
-//        // Try to load the pre-made collision shape
-//        CollisionShape chassisShape;
-//        try {
-//            chassisShape = (CollisionShape) assetManager.loadAsset(
-//                    "Models/NissanGTR/shapes/chassis-shape.j3o"
-//            );
-//            chassisShape.setScale(carNode.getWorldScale());
-//        } catch (AssetNotFoundException e) {
-//            // If not found, generate from the mesh
-//            chassisShape = CollisionShapeFactory.createDynamicMeshShape(carNode);
-//        }
-//
-//        // Create a physics control for the car body
-//        control = new VehicleControl(chassisShape, 1200f); // 1200 kg mass
-//        control.setLinearDamping(0.05f); // aerodynamic drag
-//
-//        carNode.addControl(control);
-//
-//        carNode.setShadowMode(RenderQueue.ShadowMode.Cast);
-//
-//        control.setSuspensionCompression(compValue * 2.0f * FastMath.sqrt(stiffness));
-//        control.setSuspensionDamping(dampValue * 2.0f * FastMath.sqrt(stiffness));
-//        control.setSuspensionStiffness(stiffness);
-//        control.setMaxSuspensionForce(10000);
-//
-//        Vector3f wheelDirection = new Vector3f(0, -1, 0);
-//        Vector3f wheelAxle = new Vector3f(-1, 0, 0);
-//
-//        float wheelRadius = getWheelRadius("WheelFrontRight");
-//        float back_wheel_h = (wheelRadius * 1.7f) - 1f;
-//        float front_wheel_h = (wheelRadius * 1.9f) - 1f;
-//
-//        addWheel("WheelFrontRight", front_wheel_h, wheelRadius, true, wheelDirection, wheelAxle);
-//        addWheel("WheelFrontLeft", front_wheel_h, wheelRadius, true, wheelDirection, wheelAxle);
-//        addWheel("WheelBackRight", back_wheel_h, wheelRadius, false, wheelDirection, wheelAxle);
-//        addWheel("WheelBackLeft", back_wheel_h, wheelRadius, false, wheelDirection, wheelAxle);
-//
-//        // Front wheels - more grip for stability
-//        control.getWheel(0).setFrictionSlip(3.5f); // front left
-//        control.getWheel(1).setFrictionSlip(3.5f); // front right
-//
-//        // Rear wheels - slightly less grip to prevent oversteer
-//        control.getWheel(2).setFrictionSlip(4f); // rear left
-//        control.getWheel(3).setFrictionSlip(4f); // rear right
 
         physicsSpace.add(control);
     }
@@ -200,7 +156,7 @@ public class Gtr {
 //        Vector3f angularVelocity = control.getAngularVelocity();
 //        Vector3f angularDamping = new Vector3f(
 //                angularVelocity.x * -0.5f,
-//                angularVelocity.y * -10f,  // stronger yaw damping
+//                angularVelocity.y * 1000f,  // stronger yaw damping
 //                angularVelocity.z * -0.5f
 //        );
 //        control.applyTorque(angularDamping);

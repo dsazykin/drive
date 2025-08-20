@@ -3,6 +3,7 @@ package jMonkeyEngine;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.VehicleControl;
+import com.jme3.bullet.objects.VehicleWheel;
 import com.jme3.font.BitmapText;
 import com.jme3.input.KeyInput;
 import com.jme3.input.controls.ActionListener;
@@ -18,6 +19,7 @@ import jMonkeyEngine.Entities.Gtr;
 import jMonkeyEngine.Entities.SportsCar;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -232,7 +234,7 @@ public class Main extends SimpleApplication
         sportsCar = new Gtr(assetManager, bulletAppState.getPhysicsSpace());
         // Set desired spawn location
         Quaternion rotation = new Quaternion();
-        rotation.fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y);
+        rotation.fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y);
 
         // Apply to the physics control (VehicleControl or similar)
         sportsCar.getControl().setPhysicsLocation(resetPoint);
@@ -317,10 +319,10 @@ public class Main extends SimpleApplication
             control.setLinearVelocity(new Vector3f(0,0,0));
             control.setAngularVelocity(new Vector3f(0,0,0));
             sportsCar.getControl().setPhysicsLocation(resetPoint);
-            sportsCar.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
+            sportsCar.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
 
             sportsCar.getCarNode().setLocalTranslation(resetPoint);
-            sportsCar.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
+            sportsCar.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
         }
 
         if (binding.equals("GUI") && !value) {
