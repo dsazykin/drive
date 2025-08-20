@@ -19,6 +19,13 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     implementation 'org.jmonkeyengine:jme3-bullet:3.3.0-beta1'
     implementation 'org.jmonkeyengine:jme3-bullet-native:3.3.0-beta1'
+
+    implementation 'com.simsilica:lemur:1.16.0'
+    // Full groovy runtime (needed for Lemur styles)
+    implementation 'org.codehaus.groovy:groovy-all:3.0.9'
+
+    // Optional: get rid of SLF4J warning
+    implementation 'org.slf4j:slf4j-simple:1.7.36'
 }
 
 application {
