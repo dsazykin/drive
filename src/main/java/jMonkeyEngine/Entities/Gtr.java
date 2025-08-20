@@ -1,18 +1,26 @@
 package jMonkeyEngine.Entities;
 
+import com.jme3.app.SimpleApplication;
 import com.jme3.asset.AssetManager;
 import com.jme3.asset.AssetNotFoundException;
 import com.jme3.bounding.BoundingBox;
 import com.jme3.bullet.PhysicsSpace;
 import com.jme3.bullet.collision.shapes.CollisionShape;
 import com.jme3.bullet.control.VehicleControl;
+import com.jme3.bullet.objects.VehicleWheel;
 import com.jme3.bullet.util.CollisionShapeFactory;
+import com.jme3.material.Material;
+import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
 import com.jme3.math.Vector3f;
 import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
+import com.jme3.scene.debug.Arrow;
+import jMonkeyEngine.Main;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Gtr {
     private final VehicleControl control;
@@ -38,70 +46,18 @@ public class Gtr {
     private boolean breaking = false;
 
     public Gtr(AssetManager assetManager, PhysicsSpace physicsSpace) {
-        float stiffness = 120.0f;
-        float compValue = 0.2f;
-        float dampValue = 0.3f;
-
         car = new Nismo();
         car.load(assetManager);
 
         carNode = car.getNode();
         control = car.getVehicleControl();
 
-//        // Load the car visual model
-//        carNode = (Node) assetManager.loadModel("Models/gtr_nismo/scene.gltf.j3o");
-//
-//        // Try to load the pre-made collision shape
-//        CollisionShape chassisShape;
-//        try {
-//            chassisShape = (CollisionShape) assetManager.loadAsset(
-//                    "Models/NissanGTR/shapes/chassis-shape.j3o"
-//            );
-//            chassisShape.setScale(carNode.getWorldScale());
-//        } catch (AssetNotFoundException e) {
-//            // If not found, generate from the mesh
-//            chassisShape = CollisionShapeFactory.createDynamicMeshShape(carNode);
-//        }
-//
-//        // Create a physics control for the car body
-//        control = new VehicleControl(chassisShape, 1200f); // 1200 kg mass
-//        control.setLinearDamping(0.05f); // aerodynamic drag
-//
-//        carNode.addControl(control);
-//
-//        carNode.setShadowMode(RenderQueue.ShadowMode.Cast);
-//
-//        control.setSuspensionCompression(compValue * 2.0f * FastMath.sqrt(stiffness));
-//        control.setSuspensionDamping(dampValue * 2.0f * FastMath.sqrt(stiffness));
-//        control.setSuspensionStiffness(stiffness);
-//        control.setMaxSuspensionForce(10000);
-//
-//        Vector3f wheelDirection = new Vector3f(0, -1, 0);
-//        Vector3f wheelAxle = new Vector3f(-1, 0, 0);
-//
-//        float wheelRadius = getWheelRadius("WheelFrontRight");
-//        float back_wheel_h = (wheelRadius * 1.7f) - 1f;
-//        float front_wheel_h = (wheelRadius * 1.9f) - 1f;
-//
-//        addWheel("WheelFrontRight", front_wheel_h, wheelRadius, true, wheelDirection, wheelAxle);
-//        addWheel("WheelFrontLeft", front_wheel_h, wheelRadius, true, wheelDirection, wheelAxle);
-//        addWheel("WheelBackRight", back_wheel_h, wheelRadius, false, wheelDirection, wheelAxle);
-//        addWheel("WheelBackLeft", back_wheel_h, wheelRadius, false, wheelDirection, wheelAxle);
-//
-//        // Front wheels - more grip for stability
-//        control.getWheel(0).setFrictionSlip(3.5f); // front left
-//        control.getWheel(1).setFrictionSlip(3.5f); // front right
-//
-//        // Rear wheels - slightly less grip to prevent oversteer
-//        control.getWheel(2).setFrictionSlip(4f); // rear left
-//        control.getWheel(3).setFrictionSlip(4f); // rear right
-
         physicsSpace.add(control);
     }
 
     // Physics Calculations
 
-    public void weightTransfer(float velocity, float speed) {
+    public List<Float> weightTransfer(float velocity, float speed) {
         // Forward/Backward weight transfer
         float weightTransferLongitudinal =
                 (mass * (accelerationValue / mass) * cgHeight) /
@@ -132,21 +88,48 @@ public class Gtr {
         float rightLoadFactor = rightLoad / staticRightLoad;
 
         float speedFactor = 1f / (1 - (3 * FastMath.log(1 / (0.0002f * FastMath.abs(speed) + 1)) ));
-        float frontLeftFriction = (2.6f * (frontLoadFactor * leftLoadFactor * 1.1f)) * speedFactor;
-        float frontRightFriction = (2.6f * (frontLoadFactor * rightLoadFactor * 1.1f)) * speedFactor;
-        float backLeftFriction = (3.1f * (rearLoadFactor * leftLoadFactor * 1.1f)) * speedFactor;
-        float backRightFriction = (3.1f * (rearLoadFactor * rightLoadFactor * 1.1f)) * speedFactor;
+        float frontLeftFriction = (3f * (frontLoadFactor * leftLoadFactor * 1.1f)) * speedFactor;
+        float frontRightFriction = (3f * (frontLoadFactor * rightLoadFactor * 1.1f)) * speedFactor;
+        float backLeftFriction = (3.5f * (rearLoadFactor * leftLoadFactor * 1.1f)) * speedFactor;
+        float backRightFriction = (3.5f * (rearLoadFactor * rightLoadFactor * 1.1f)) * speedFactor;
+
+        float staticWheelLoad = (totalMass * gravity) / 4f;
+
+        float flLoad = staticWheelLoad
+                - (weightTransferLongitudinal / 2f)  // front loses load under accel
+                - (weightTransferLateral / 2f);     // left loses load in right turn
+
+        float frLoad = staticWheelLoad
+                - (weightTransferLongitudinal / 2f)
+                + (weightTransferLateral / 2f);
+
+        float rlLoad = staticWheelLoad
+                + (weightTransferLongitudinal / 2f) // rear gains load under accel
+                - (weightTransferLateral / 2f);
+
+        float rrLoad = staticWheelLoad
+                + (weightTransferLongitudinal / 2f)
+                + (weightTransferLateral / 2f);
+
 
         // Apply normalized load to base friction
-        control.getWheel(0).setFrictionSlip(FastMath.clamp(frontLeftFriction, 0f,
-                                                           100f));
-        control.getWheel(1).setFrictionSlip(FastMath.clamp(frontRightFriction, 0f,
-                                                           100f));
+        frontLeftFriction = FastMath.clamp(frontLeftFriction, 0.5f,
+                                                           100f);
+        frontRightFriction = FastMath.clamp(frontRightFriction, 0.5f,
+                                                           100f);
 
-        control.getWheel(2).setFrictionSlip(FastMath.clamp(backLeftFriction, -0f,
-                                                           100f));
-        control.getWheel(3).setFrictionSlip(FastMath.clamp(backRightFriction, 0f,
-                                                           100f));
+        backLeftFriction = FastMath.clamp(backLeftFriction, 1f,
+                                                           100f);
+        backRightFriction = FastMath.clamp(backRightFriction, 1f,
+                                                           100f);
+
+        List<Float> results = new ArrayList<>();
+        results.add(flLoad);
+        results.add(frLoad);
+        results.add(rlLoad);
+        results.add(rrLoad);
+
+        return results;
     }
 
     public void move(float velocity, float speed) {
@@ -200,7 +183,7 @@ public class Gtr {
 //        Vector3f angularVelocity = control.getAngularVelocity();
 //        Vector3f angularDamping = new Vector3f(
 //                angularVelocity.x * -0.5f,
-//                angularVelocity.y * -10f,  // stronger yaw damping
+//                angularVelocity.y * 1000f,  // stronger yaw damping
 //                angularVelocity.z * -0.5f
 //        );
 //        control.applyTorque(angularDamping);
@@ -237,6 +220,130 @@ public class Gtr {
 
         // Total Resistance
         return dragForce + rollingResistance;
+    }
+
+    public float computeSlipAngle(Vector3f wheelForward, Vector3f wheelVelocity) {
+        // Project velocity onto ground plane
+        Vector3f v = wheelVelocity.clone();
+        v.y = 0;
+        wheelForward = wheelForward.clone();
+        wheelForward.y = 0;
+
+        if (v.lengthSquared() < 1e-4f) {
+            return 0f; // not moving, no slip
+        }
+
+        v.normalizeLocal();
+        wheelForward.normalizeLocal();
+
+        float dot = wheelForward.dot(v);
+        float det = wheelForward.x * v.z - wheelForward.z * v.x; // 2D cross product
+        return FastMath.atan2(det, dot); // signed slip angle in radians
+    }
+
+    public float computeSlipRatio(float wheelAngularVelocity, float wheelRadius,
+                                  Vector3f wheelVelocity, Vector3f wheelForward) {
+        float vLong = wheelVelocity.dot(wheelForward); // forward velocity component
+        float wheelSpeed = wheelAngularVelocity * wheelRadius;
+
+        if (Math.abs(vLong) < 0.5f) return 0f; // avoid divide by zero at standstill
+
+        return (wheelSpeed - vLong) / Math.abs(vLong);
+    }
+
+    public void updatePhysics(VehicleWheel wheel, float physicsTpf) {
+        // Get contact info
+        Vector3f contactPoint = wheel.getCollisionLocation();
+        if (contactPoint == null) return;
+        Vector3f n = wheel.getCollisionNormal();
+        if (n == null) n = Vector3f.UNIT_Y;
+
+        // --- A) Build orthonormal wheel frame from ground normal ---
+        Vector3f fRaw = wheel.getWheelSpatial().getWorldRotation().mult(Vector3f.UNIT_Z);
+        Vector3f f = fRaw.subtract(n.mult(fRaw.dot(n))).normalizeLocal();  // forward in plane
+        Vector3f r = n.cross(f).normalizeLocal();                          // right
+        f = r.cross(n).normalizeLocal();                                   // re-orthogonalize
+
+        // --- B) Relative velocity at contact ---
+        Vector3f rel = contactPoint.subtract(control.getPhysicsLocation());
+        Vector3f v = control.getLinearVelocity().add(control.getAngularVelocity().cross(rel));
+        float vLong = v.dot(f);
+        float vLat  = v.dot(r);
+
+        // --- C) Slip definitions ---
+        float slipAngle = FastMath.atan2(vLat, FastMath.abs(vLong) + 0.1f);
+        float omega = wheel.getDeltaRotation() / physicsTpf;   // rad/s
+        float vWheel = omega * wheel.getRadius();
+        float slipRatio = (vWheel - vLong) / (FastMath.abs(vLong) + 0.5f);
+        slipRatio = FastMath.clamp(slipRatio, -1.5f, 1.5f);
+
+        // --- Normal load approximation ---
+        float totalWeight = control.getMass() * 9.81f;      // N
+        float load = totalWeight / 4;  // assume even distribution
+
+        // tune scaling factor
+
+        // --- D) Lateral force curve ---
+        float muLat = 1.0f;
+        float Cα = 15000f;   // half stiffness
+        float peakA = 0.12f; // ~7°
+        float absA = FastMath.abs(slipAngle);
+        float FyLin = Cα * slipAngle;
+        float Fy = (absA <= peakA)
+                ? FyLin
+                : (Cα * peakA) * (peakA / absA) * FastMath.sign(slipAngle);
+        float FyMax = muLat * load;
+        Fy = FastMath.clamp(Fy, -FyMax, FyMax);
+        if (absA < 0.03f) Fy *= 0.2f;  // let it launch straight
+
+        // --- E) Longitudinal force curve ---
+        float muLong = 1.1f;
+        float FxMax = muLong * load;
+        float s = slipRatio;
+        float a = 10f;
+        float Fx = FxMax * ((a * s) / (1f + a * FastMath.abs(s)));
+        if (FastMath.abs(s) > 0.6f) Fx *= 0.9f;
+
+        // --- Inject car’s accel/brake forces ---
+        float driveForce = accelerationValue;
+        System.out.println(driveForce);
+        float brakeForce = 0;
+
+        // apply only to driven wheels
+
+            Fx += driveForce;
+            Fx -= Math.signum(vLong) * brakeForce;
+
+
+        // --- F) Elliptical friction limit ---
+        float ax = FxMax;
+        float ay = FyMax * 0.8f;
+        float scale = FastMath.sqrt((Fx*Fx)/(ax*ax) + (Fy*Fy)/(ay*ay));
+        if (scale > 1f) {
+            Fx /= scale;
+            Fy /= scale;
+        }
+
+        // --- G) Apply our custom forces ---
+        // (disable built-in tire friction elsewhere!)
+        Vector3f force = f.clone().multLocal(Fx).addLocal(r.clone().multLocal(Fy));
+        Vector3f forceLong = f.mult(Fx); // forward/back
+        Vector3f forceLat  = r.mult(Fy); // sideways
+
+        // Accel/brake goes into CoM (no roll-over explosions)
+        control.applyCentralForce(forceLong);
+
+        // Sideways force goes at wheel contact (so you can still drift)
+        control.applyForce(forceLat, contactPoint.subtract(control.getPhysicsLocation()));
+
+
+        // --- Debug ---
+        System.out.printf(
+                "[%s] vLong=%.2f vLat=%.2f slipAngle=%.2f° slipRatio=%.2f Fx=%.1f Fy=%.1f load=%.1f%n",
+                wheel.getWheelSpatial().getName(),
+                vLong, vLat, slipAngle * FastMath.RAD_TO_DEG, slipRatio,
+                Fx, Fy, load
+        );
     }
 
 

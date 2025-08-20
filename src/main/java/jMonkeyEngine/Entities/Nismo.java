@@ -106,7 +106,7 @@ public class Nismo extends Vehicle {
          */
         for (Wheel wheel : listWheels()) {
             wheel.setTireModel(new Tire01());
-            wheel.setFriction(1.6f);
+            wheel.setFriction(1e6f);
         }
 
         build(); // must be invoked last, to complete the Vehicle

@@ -3,6 +3,7 @@ package jMonkeyEngine;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.VehicleControl;
+import com.jme3.bullet.objects.VehicleWheel;
 import com.jme3.font.BitmapText;
 import com.jme3.input.KeyInput;
 import com.jme3.input.controls.ActionListener;
@@ -18,6 +19,7 @@ import jMonkeyEngine.Entities.Gtr;
 import jMonkeyEngine.Entities.SportsCar;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -58,6 +60,9 @@ public class Main extends SimpleApplication
     private final int CHUNK_SIZE = 1000;
     private final float SCALE = 40f;
     private long SEED;
+
+    // put this somewhere in your class
+    public Node debugNode = new Node("DebugForces");
 
     public static void main(String[] args) {
         Main app = new Main();
@@ -109,6 +114,9 @@ public class Main extends SimpleApplication
         initCar();
         loadGUI();
         initPauseMenu();
+
+        // Call this once during init:
+        rootNode.attachChild(debugNode);
     }
 
     @Override
@@ -232,7 +240,7 @@ public class Main extends SimpleApplication
         sportsCar = new Gtr(assetManager, bulletAppState.getPhysicsSpace());
         // Set desired spawn location
         Quaternion rotation = new Quaternion();
-        rotation.fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y);
+        rotation.fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y);
 
         // Apply to the physics control (VehicleControl or similar)
         sportsCar.getControl().setPhysicsLocation(resetPoint);
@@ -317,10 +325,10 @@ public class Main extends SimpleApplication
             control.setLinearVelocity(new Vector3f(0,0,0));
             control.setAngularVelocity(new Vector3f(0,0,0));
             sportsCar.getControl().setPhysicsLocation(resetPoint);
-            sportsCar.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
+            sportsCar.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
 
             sportsCar.getCarNode().setLocalTranslation(resetPoint);
-            sportsCar.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(-FastMath.HALF_PI, Vector3f.UNIT_Y));
+            sportsCar.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
         }
 
         if (binding.equals("GUI") && !value) {
@@ -381,9 +389,19 @@ public class Main extends SimpleApplication
             float speed = control.getCurrentVehicleSpeedKmHour();
             float velocity = speed / 3.6f;
 
-            sportsCar.weightTransfer(velocity, speed);
+            List<Float> loads = sportsCar.weightTransfer(velocity, speed);
             sportsCar.move(velocity, speed);
             sportsCar.steer(speed, tpf);
+
+            control.accelerate(0f);
+            control.brake(0f);
+            for (int i = 0; i < control.getNumWheels(); ++i) {
+                control.getWheel(i).setFrictionSlip(1.6f);
+                sportsCar.updatePhysics(control.getWheel(i), tpf);
+            }
+
+            // Then in updatePhysics():
+            debugNode.detachAllChildren(); // clear old arrows
 
             if (followCam) {
                 followCam(tpf, control);

@@ -169,9 +169,28 @@ public class PacejkaTireModel {
      * @return - lateral tire force in N.
      */
     public float calcLateralTireForce(float slipAngle) {
-        this.lateralValue = calcSlipAngleFactor(slipAngle, lateral)
-                * calcLoadForce(load, lateral);
-        return lateralValue;
+        // Tire parameters (tune these!)
+        float corneringStiffness = 40000f; // N/rad, higher = grippier tires
+        float mu = 1.0f;                   // friction coefficient
+        float peakAngle = 0.2f;            // rad ~ 11.5°, where max grip occurs
+
+        float Fy;
+        float slipAbs = FastMath.abs(slipAngle);
+
+        if (slipAbs < peakAngle) {
+            // Linear build-up of lateral force
+            Fy = corneringStiffness * slipAngle;
+        } else {
+            // After peak, lateral force falls off
+            float peakForce = corneringStiffness * peakAngle;
+            Fy = peakForce * (peakAngle / slipAbs) * FastMath.sign(slipAngle);
+        }
+
+        // Clamp to max friction circle
+        float maxForce = load * mu;  // load passed into your tire model
+        Fy = FastMath.clamp(Fy, -maxForce, maxForce);
+
+        return Fy;
     }
 
     /**
@@ -182,9 +201,13 @@ public class PacejkaTireModel {
      * @return the estimated force (in Newtons)
      */
     public float calcLongitudeTireForce(float slipAngle) {
-        this.longitudinalValue = calcSlipAngleFactor(slipAngle, longitudinal)
-                * calcLoadForce(load, longitudinal);
-        return longitudinalValue;
+        float B = 10f;  // stiffness factor
+        float C = 1.9f; // shape factor
+        float D = load * 1.0f; // peak value (mu * load)
+        float E = 0.97f; // curvature
+
+        return (float)(D * Math.sin(C * Math.atan(B * slipAngle - E * (B * slipAngle - Math.atan(B *
+                                                                                                         slipAngle)))));
     }
 
     /**
@@ -198,6 +221,16 @@ public class PacejkaTireModel {
         this.momentValue = calcSlipAngleFactor(slipAngle, alignMoment)
                 * calcLoadForce(load, alignMoment);
         return momentValue;
+    }
+
+    /**
+     * Estimate the reduced lateral force using a circle function.
+     *
+     * @return the estimated force (in Newtons)
+     */
+    public float calculateFrictionCircle() {
+        float mu = 1.0f; // asphalt
+        return load * mu;
     }
 
     /**
@@ -313,5 +346,9 @@ public class PacejkaTireModel {
         if (changeListener != null) {
             changeListener.valueChanged();
         }
+    }
+
+    public static float circle(float x) {
+        return FastMath.sqrt(1f - FastMath.sqr(FastMath.clamp(x, -1f, 1f)));
     }
 }

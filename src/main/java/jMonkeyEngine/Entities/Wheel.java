@@ -219,4 +219,8 @@ public class Wheel {
     public void setTireModel(PacejkaTireModel tireModel) {
         this.tireModel = tireModel;
     }
+
+    public int getWheelIndex() {
+        return wheelIndex;
+    }
 }
