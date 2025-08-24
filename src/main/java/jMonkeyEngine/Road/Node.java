@@ -10,6 +10,10 @@ public class Node implements Comparable<Node> {
     public int dxFromParent, dyFromParent;
     public float dirMag;
 
+    public Node(int x, int y) {
+        this(x, y, 0, 0, 0, null, 0, 0);
+    }
+
     public Node(int x, int y, float height, float gCost, float fCost, Node parent) {
         this(x, y, height, gCost, fCost, parent, 0, 0);
     }

@@ -53,20 +53,13 @@ public class GameplayState extends BaseAppState implements ActionListener {
 
     private Node gameplayRoot;
     private Node hud;
+    private Node pauseMenuNode;
+    private Node debugMenu;
 
-    private BitmapText speedText;
-    private BitmapText frontLeftText;
-    private BitmapText frontRightText;
-    private BitmapText rearLeftText;
-    private BitmapText rearRightText;
-    private BitmapText chunkX;
-    private BitmapText chunkZ;
-    private BitmapText pauseText;
-    private BitmapText startText;
+    private BitmapText speedText, frontLeftText, frontRightText, rearLeftText, rearRightText, chunkX, chunkZ, pauseText, startText;
 
     private boolean loadingDone = false;
     private boolean isPaused = false;
-    private Node pauseMenuNode;
     public boolean guiLoaded = false;
     private boolean started = false;
 
@@ -92,13 +85,14 @@ public class GameplayState extends BaseAppState implements ActionListener {
         guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
 
         gameplayRoot = new Node("Gameplay Root");
-        hud = new Node("hud");
+        hud = new Node("HUD");
+        debugMenu = new Node("Debug Menu");
 
         rootNode.attachChild(gameplayRoot);
 
         executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
-        SEED = FastMath.nextRandomInt(0, 1000000000);
+        SEED = FastMath.nextRandomInt(0, (int) Float.MAX_VALUE);
         System.out.println("Seed: " + SEED);
 
         sapp.getViewPort().setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
@@ -232,7 +226,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
             followCam = !followCam;
             if (!started) {
                 started = true;
-                guiNode.detachChild(startText);
+                hud.detachChild(startText);
                 flyCam.setMoveSpeed(300);
                 bulletAppState.setEnabled(true);
             }
@@ -242,6 +236,11 @@ public class GameplayState extends BaseAppState implements ActionListener {
             VehicleControl control = sportsCar.getControl();
             control.setLinearVelocity(new Vector3f(0,0,0));
             control.setAngularVelocity(new Vector3f(0,0,0));
+
+            Vector3f carLocation = sportsCar.getCarNode().getWorldTranslation();
+            jMonkeyEngine.Road.Node carNode = new jMonkeyEngine.Road.Node((int) carLocation.x,
+                                                                          (int) carLocation.z);
+
             sportsCar.getControl().setPhysicsLocation(resetPoint);
             sportsCar.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
 
@@ -252,9 +251,9 @@ public class GameplayState extends BaseAppState implements ActionListener {
         if (binding.equals("GUI") && !value) {
             gui = !gui;
             if (gui) {
-                guiNode.attachChild(hud);
+                hud.attachChild(debugMenu);
             } else {
-                guiNode.detachChild(hud);
+                hud.detachChild(debugMenu);
             }
         }
 
@@ -272,91 +271,98 @@ public class GameplayState extends BaseAppState implements ActionListener {
     }
 
     private void loadGUI() {
+        guiNode.attachChild(hud);
+
         startText = new BitmapText(guiFont, false);
         startText.setSize(guiFont.getCharSet().getRenderedSize());
         startText.setText("Press 'C' to start");
         startText.setLocalTranslation(((float) cam.getWidth() / 2) - (startText.getLineWidth() / 2),
                                       (float) cam.getHeight() / 2, 0);
-        guiNode.attachChild(startText);
-
-        speedText = new BitmapText(guiFont, false);
-        speedText.setSize(guiFont.getCharSet().getRenderedSize());
-        speedText.setLocalTranslation(10, cam.getHeight() - 10, 0);
-        guiNode.attachChild(speedText);
-
-        frontLeftText = new BitmapText(guiFont, false);
-        frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
-        frontLeftText.setLocalTranslation(10, cam.getHeight() - 50, 0);
-        hud.attachChild(frontLeftText);
-
-        frontRightText = new BitmapText(guiFont, false);
-        frontRightText.setSize(guiFont.getCharSet().getRenderedSize());
-        frontRightText.setLocalTranslation(130, cam.getHeight() - 50, 0);
-        hud.attachChild(frontRightText);
-
-        rearLeftText = new BitmapText(guiFont, false);
-        rearLeftText.setSize(guiFont.getCharSet().getRenderedSize());
-        rearLeftText.setLocalTranslation(10, cam.getHeight() - 70, 0);
-        hud.attachChild(rearLeftText);
-
-        rearRightText = new BitmapText(guiFont, false);
-        rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
-        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0);
-        hud.attachChild(rearRightText);
-
-        chunkX = new BitmapText(guiFont, false);
-        chunkX.setSize(guiFont.getCharSet().getRenderedSize());
-        chunkX.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 10, 0);
-        hud.attachChild(chunkX);
-
-        chunkZ = new BitmapText(guiFont, false);
-        chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
-        chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
-        hud.attachChild(chunkZ);
-
-        guiLoaded = true;
-    }
-
-    public void reloadGUI() {
-        hud.detachAllChildren();
-        pauseMenuNode.detachAllChildren();
-        hud.detachChild(speedText);
+        hud.attachChild(startText);
 
         speedText = new BitmapText(guiFont, false);
         speedText.setSize(guiFont.getCharSet().getRenderedSize());
         speedText.setLocalTranslation(10, cam.getHeight() - 10, 0);
         hud.attachChild(speedText);
 
+        hud.attachChild(debugMenu);
+
         frontLeftText = new BitmapText(guiFont, false);
         frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
         frontLeftText.setLocalTranslation(10, cam.getHeight() - 50, 0);
-        hud.attachChild(frontLeftText);
+        debugMenu.attachChild(frontLeftText);
 
         frontRightText = new BitmapText(guiFont, false);
         frontRightText.setSize(guiFont.getCharSet().getRenderedSize());
         frontRightText.setLocalTranslation(130, cam.getHeight() - 50, 0);
-        hud.attachChild(frontRightText);
+        debugMenu.attachChild(frontRightText);
 
         rearLeftText = new BitmapText(guiFont, false);
         rearLeftText.setSize(guiFont.getCharSet().getRenderedSize());
         rearLeftText.setLocalTranslation(10, cam.getHeight() - 70, 0);
-        hud.attachChild(rearLeftText);
+        debugMenu.attachChild(rearLeftText);
 
         rearRightText = new BitmapText(guiFont, false);
         rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
         rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0);
-        hud.attachChild(rearRightText);
+        debugMenu.attachChild(rearRightText);
 
         chunkX = new BitmapText(guiFont, false);
         chunkX.setSize(guiFont.getCharSet().getRenderedSize());
         chunkX.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 10, 0);
-        hud.attachChild(chunkX);
+        debugMenu.attachChild(chunkX);
 
         chunkZ = new BitmapText(guiFont, false);
         chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
         chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
-        hud.attachChild(chunkZ);
+        debugMenu.attachChild(chunkZ);
 
+        guiLoaded = true;
+    }
+
+    public void reloadGUI() {
+        hud.detachAllChildren();
+        debugMenu.detachAllChildren();
+        pauseMenuNode.detachAllChildren();
+
+        speedText = new BitmapText(guiFont, false);
+        speedText.setSize(guiFont.getCharSet().getRenderedSize());
+        speedText.setLocalTranslation(10, cam.getHeight() - 10, 0);
+        hud.attachChild(speedText);
+
+        hud.attachChild(debugMenu);
+
+        frontLeftText = new BitmapText(guiFont, false);
+        frontLeftText.setSize(guiFont.getCharSet().getRenderedSize());
+        frontLeftText.setLocalTranslation(10, cam.getHeight() - 50, 0);
+        debugMenu.attachChild(frontLeftText);
+
+        frontRightText = new BitmapText(guiFont, false);
+        frontRightText.setSize(guiFont.getCharSet().getRenderedSize());
+        frontRightText.setLocalTranslation(130, cam.getHeight() - 50, 0);
+        debugMenu.attachChild(frontRightText);
+
+        rearLeftText = new BitmapText(guiFont, false);
+        rearLeftText.setSize(guiFont.getCharSet().getRenderedSize());
+        rearLeftText.setLocalTranslation(10, cam.getHeight() - 70, 0);
+        debugMenu.attachChild(rearLeftText);
+
+        rearRightText = new BitmapText(guiFont, false);
+        rearRightText.setSize(guiFont.getCharSet().getRenderedSize());
+        rearRightText.setLocalTranslation(130, cam.getHeight() - 70, 0);
+        debugMenu.attachChild(rearRightText);
+
+        chunkX = new BitmapText(guiFont, false);
+        chunkX.setSize(guiFont.getCharSet().getRenderedSize());
+        chunkX.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 10, 0);
+        debugMenu.attachChild(chunkX);
+
+        chunkZ = new BitmapText(guiFont, false);
+        chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
+        chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
+        debugMenu.attachChild(chunkZ);
+
+        hud.attachChild(pauseMenuNode);
         pauseText = new BitmapText(guiFont);
         pauseText.setText("Game Paused\nPress ESC to Resume\nPress Q to Quit");
         pauseText.setLocalTranslation((float) cam.getWidth() / 4, (float) cam.getHeight() / 2, 0);
@@ -371,7 +377,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
         pauseText.setLocalTranslation((float) cam.getWidth() / 4, (float) cam.getHeight() / 2, 0);
         pauseMenuNode.attachChild(pauseText);
 
-        guiNode.attachChild(pauseMenuNode);
+        hud.attachChild(pauseMenuNode);
         pauseMenuNode.setCullHint(Spatial.CullHint.Always);
     }
 
