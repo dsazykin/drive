@@ -169,9 +169,9 @@ public class ChunkManager {
         return generator.createGeometry(childCoord, mesh);
     }
 
-    public float getSpawnHeight(int MAX_HEIGHT) {
-        float[][] spawnChunk = generatedHeightmaps.get(new ChunkCoord(0,0));
-        return (spawnChunk[0][PARENT_SIZE / 2] - 2) * MAX_HEIGHT;
+    public float getHeight(int MAX_HEIGHT, int x, int z, ChunkCoord chunk) {
+        float[][] heightMap = generatedHeightmaps.get(chunk);
+        return (heightMap[x][z] - 2) * MAX_HEIGHT;
     }
 
     public Vector3f getCamDirection(float height) {
@@ -181,5 +181,9 @@ public class ChunkManager {
         System.out.println(point.y * (SCALE / 16));
         return new Vector3f(point.x * (SCALE / 16), height - 15,
                             point.y * (SCALE / 16));
+    }
+
+    public List<jMonkeyEngine.Road.Node> getRoadPoints(ChunkCoord chunk) {
+        return generatedRoads.get(chunk);
     }
 }

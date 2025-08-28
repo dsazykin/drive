@@ -22,10 +22,12 @@ import com.jme3.math.Vector3f;
 import com.jme3.renderer.Camera;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
+import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Entities.Gtr;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -116,10 +118,8 @@ public class GameplayState extends BaseAppState implements ActionListener {
         loadScene();
         System.out.println("loaded terrain");
 
-        float zSpawn = (CHUNK_SIZE / 2) * (SCALE / 16);
-        float spawnHeight = manager.getSpawnHeight(200);
-        System.out.println(zSpawn);
-        System.out.println(spawnHeight);
+        int zSpawn = (int) ((CHUNK_SIZE / 2) * (SCALE / 16));
+        float spawnHeight = manager.getHeight(200, 0, 500, new ChunkCoord(0, 0));
         resetPoint = new Vector3f(5f, spawnHeight + 1f, zSpawn);
         System.out.println("got reset point");
 
@@ -238,8 +238,23 @@ public class GameplayState extends BaseAppState implements ActionListener {
             control.setAngularVelocity(new Vector3f(0,0,0));
 
             Vector3f carLocation = sportsCar.getCarNode().getWorldTranslation();
-            jMonkeyEngine.Road.Node carNode = new jMonkeyEngine.Road.Node((int) carLocation.x,
-                                                                          (int) carLocation.z);
+            ChunkCoord currentChunk = new ChunkCoord(
+                    (int) (cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 16))),
+                    (int) (cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 16))));
+            jMonkeyEngine.Road.Node carNode =
+                    new jMonkeyEngine.Road.Node((int) (carLocation.x / (SCALE / 16) - (currentChunk.x * (CHUNK_SIZE - 1f))),
+                                                (int) (carLocation.z / (SCALE / 16) - (currentChunk.z * (CHUNK_SIZE - 1f))));
+
+            List<jMonkeyEngine.Road.Node> roadNodes = manager.getRoadPoints(currentChunk);
+            jMonkeyEngine.Road.Node nearestRoadPoint = getNearestRoadPoint(carNode, roadNodes,
+                                                                          100000, null);
+            System.out.println(nearestRoadPoint);
+            System.out.println(carNode);
+
+            float height = manager.getHeight(200, nearestRoadPoint.x, nearestRoadPoint.y, currentChunk);
+            Vector3f resetPoint =
+                    new Vector3f(nearestRoadPoint.x * (SCALE / 16) + (currentChunk.x * (CHUNK_SIZE - 1f) * (SCALE / 16)) + 1, height + 1,
+                                               nearestRoadPoint.y * (SCALE / 16) + (currentChunk.z * (CHUNK_SIZE - 1f) * (SCALE / 16)));
 
             sportsCar.getControl().setPhysicsLocation(resetPoint);
             sportsCar.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
@@ -489,5 +504,32 @@ public class GameplayState extends BaseAppState implements ActionListener {
             flyCam.setEnabled(true);
             bulletAppState.setEnabled(true); // Resume physics
         }
+    }
+
+    private jMonkeyEngine.Road.Node getNearestRoadPoint(jMonkeyEngine.Road.Node car,
+                                                        List<jMonkeyEngine.Road.Node> road,
+                                                        int distance,
+                                                        jMonkeyEngine.Road.Node closestPoint)  {
+        jMonkeyEngine.Road.Node middle = road.get(road.size() / 2);
+
+        int pointDistance = (int) FastMath.abs(car.x - middle.x);
+
+        jMonkeyEngine.Road.Node newClosestPoint = closestPoint;
+        int newDistance = distance;
+        if (pointDistance < distance) {
+            newClosestPoint = middle;
+            newDistance = pointDistance;
+        }
+
+        if (middle.x == car.x) return middle;
+        else if (middle.x > car.x) {
+            List<jMonkeyEngine.Road.Node> newRoad = road.subList(0, road.size() / 2);
+            if (road.size() > 1) newClosestPoint = getNearestRoadPoint(car, newRoad, newDistance, newClosestPoint);
+        } else {
+            List<jMonkeyEngine.Road.Node> newRoad = road.subList(road.size() / 2, road.size());
+            if (road.size() > 1) newClosestPoint = getNearestRoadPoint(car, newRoad, newDistance, newClosestPoint);
+        }
+
+        return newClosestPoint;
     }
 }

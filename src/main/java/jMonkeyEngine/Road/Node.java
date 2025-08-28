@@ -49,4 +49,9 @@ public class Node implements Comparable<Node> {
     public int hashCode() {
         return x * 31 + y;
     }
+
+    @Override
+    public String toString() {
+        return "Node(" + x + ", " + y + ")";
+    }
 }
