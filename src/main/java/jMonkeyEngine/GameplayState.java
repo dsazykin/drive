@@ -24,7 +24,9 @@ import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
+import jMonkeyEngine.Entities.Cars.Car;
 import jMonkeyEngine.Entities.Cars.Gtr;
+import jMonkeyEngine.Entities.Cars.VehicleModels.Nismo;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.List;
@@ -50,7 +52,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
     ChunkManager manager;
     RoadGenerator road;
 
-    private Gtr sportsCar;
+    private Car car;
     private Vector3f resetPoint;
 
     private Node gameplayRoot;
@@ -180,16 +182,16 @@ public class GameplayState extends BaseAppState implements ActionListener {
         super.update(tpf);
 
         if (loadingDone) {
-            VehicleControl control = sportsCar.getControl();
-            manager.updateChunks(sportsCar.getCarNode().getWorldTranslation());
+            VehicleControl control = car.getControl();
+            manager.updateChunks(car.getCarNode().getWorldTranslation());
 
             // 1. Get current speed
             float speed = control.getCurrentVehicleSpeedKmHour();
             float velocity = speed / 3.6f;
 
-            sportsCar.weightTransfer(velocity, speed);
-            sportsCar.move(velocity, speed);
-            sportsCar.steer(speed, tpf);
+            car.weightTransfer(velocity, speed);
+            car.move(velocity, speed);
+            car.steer(speed, tpf);
 
             if (followCam) {
                 followCam(tpf, control);
@@ -206,20 +208,20 @@ public class GameplayState extends BaseAppState implements ActionListener {
     public void onAction(String binding, boolean value, float tpf) {
         if (binding.equals("Left")) {
             if (value) {
-                sportsCar.setTargetSteeringValue(1f);
+                car.setTargetSteeringValue(1f);
             } else {
-                sportsCar.setTargetSteeringValue(0f);
+                car.setTargetSteeringValue(0f);
             }
         } else if (binding.equals("Right")) {
             if (value) {
-                sportsCar.setTargetSteeringValue(-1f);
+                car.setTargetSteeringValue(-1f);
             } else {
-                sportsCar.setTargetSteeringValue(0f);
+                car.setTargetSteeringValue(0f);
             }
         } else if (binding.equals("Accelerate")) {
-            sportsCar.setAccelerating(value);
+            car.setAccelerating(value);
         } else if (binding.equals("Break")) {
-            sportsCar.setBreaking(value);
+            car.setBreaking(value);
         }
 
         if (binding.equals("Cam") && !value) {
@@ -233,11 +235,11 @@ public class GameplayState extends BaseAppState implements ActionListener {
         }
 
         if (binding.equals("Reset") && !value) {
-            VehicleControl control = sportsCar.getControl();
+            VehicleControl control = car.getControl();
             control.setLinearVelocity(new Vector3f(0,0,0));
             control.setAngularVelocity(new Vector3f(0,0,0));
 
-            Vector3f carLocation = sportsCar.getCarNode().getWorldTranslation();
+            Vector3f carLocation = car.getCarNode().getWorldTranslation();
             ChunkCoord currentChunk = new ChunkCoord(
                     (int) (cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 16))),
                     (int) (cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 16))));
@@ -256,11 +258,11 @@ public class GameplayState extends BaseAppState implements ActionListener {
                     new Vector3f(nearestRoadPoint.x * (SCALE / 16) + (currentChunk.x * (CHUNK_SIZE - 1f) * (SCALE / 16)) + 1, height + 1,
                                                nearestRoadPoint.y * (SCALE / 16) + (currentChunk.z * (CHUNK_SIZE - 1f) * (SCALE / 16)));
 
-            sportsCar.getControl().setPhysicsLocation(resetPoint);
-            sportsCar.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
+            car.getControl().setPhysicsLocation(resetPoint);
+            car.getControl().setPhysicsRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
 
-            sportsCar.getCarNode().setLocalTranslation(resetPoint);
-            sportsCar.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
+            car.getCarNode().setLocalTranslation(resetPoint);
+            car.getCarNode().setLocalRotation(new Quaternion().fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y));
         }
 
         if (binding.equals("GUI") && !value) {
@@ -401,20 +403,20 @@ public class GameplayState extends BaseAppState implements ActionListener {
     }
 
     private void initCar() {
-        sportsCar = new Gtr(sapp.getAssetManager(), bulletAppState.getPhysicsSpace());
+        car = new Gtr(sapp.getAssetManager(), bulletAppState.getPhysicsSpace(), new Nismo());
         // Set desired spawn location
         Quaternion rotation = new Quaternion();
         rotation.fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y);
 
         // Apply to the physics control (VehicleControl or similar)
-        sportsCar.getControl().setPhysicsLocation(resetPoint);
-        sportsCar.getControl().setPhysicsRotation(rotation);
+        car.getControl().setPhysicsLocation(resetPoint);
+        car.getControl().setPhysicsRotation(rotation);
 
         // Optionally also apply to the visual node (if needed)
-        sportsCar.getCarNode().setLocalTranslation(resetPoint);
-        sportsCar.getCarNode().rotate(rotation);
+        car.getCarNode().setLocalTranslation(resetPoint);
+        car.getCarNode().rotate(rotation);
 
-        gameplayRoot.attachChild(sportsCar.getCarNode());
+        gameplayRoot.attachChild(car.getCarNode());
     }
 
     private void setUpLight() {
