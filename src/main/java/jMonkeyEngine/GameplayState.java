@@ -26,7 +26,9 @@ import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Entities.Cars.Car;
 import jMonkeyEngine.Entities.Cars.Gtr;
+import jMonkeyEngine.Entities.Cars.Pickup;
 import jMonkeyEngine.Entities.Cars.VehicleModels.Nismo;
+import jMonkeyEngine.Entities.Cars.VehicleModels.PickupTruck;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.List;
@@ -403,7 +405,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
     }
 
     private void initCar() {
-        car = new Gtr(sapp.getAssetManager(), bulletAppState.getPhysicsSpace(), new Nismo());
+        car = new Pickup(sapp.getAssetManager(), bulletAppState.getPhysicsSpace(), new PickupTruck());
         // Set desired spawn location
         Quaternion rotation = new Quaternion();
         rotation.fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y);
