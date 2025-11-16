@@ -32,15 +32,15 @@ public class Gtr {
     private float targetSteeringValue = 0;
 
     private final float maxSpeed = 320f / 3.6f;
-    private final float accelerationConstant = 0.1441128652f;
+    private final float accelerationConstant = 0.1387753516f;
 
     private final float maxReverse = 16.667f;
-    private final float reverseConstant = 0.2985932482f;
+    private final float reverseConstant = 0.287534238854f;
 
-    private float wheelBase = 2.78f;
-    private float trackWidth = 1.6f;
+    private final float wheelBase = 2.78f;
+    private final float trackWidth = 1.6f;
     private final float cgHeight = 0.5f;
-    private final float mass = 1525;
+    private final float mass = 1735;
 
     private boolean accelerating = false;
     private boolean breaking = false;
