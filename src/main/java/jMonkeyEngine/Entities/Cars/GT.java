@@ -8,17 +8,17 @@ public class GT extends Car {
     public GT(AssetManager assetManager, PhysicsSpace physicsSpace, GrandTourer car) {
         super(assetManager, physicsSpace, car,
               new PhysicsConfig(
-                      171f / 3.6f,        // maxSpeed
-                      0.1311915939f,      // accelerationConstant
-                      7.0f,               // maxReverse
-                      0.5f,               // reverseConstant
-                      3.27f,              // wheelBase
-                      1.62f,              // trackWidth
-                      0.8f,               // cgHeight
-                      2002,               // mass
-                      0.40f,              // dragCoefficient
-                      2.97f,              // frontalArea
-                      0.018f              // rollingResistanceCoefficient
+                      220f / 3.6f,        // maxSpeed
+                      0.0932516621f,      // accelerationConstant
+                      13.8f,              // maxReverse
+                      0.19321187354f,     // reverseConstant
+                      2.415f,             // wheelBase
+                      1.267f,             // trackWidth
+                      0.49f,              // cgHeight
+                      970,                // mass
+                      0.39f,              // dragCoefficient
+                      1.65f,              // frontalArea
+                      0.012f              // rollingResistanceCoefficient
               )
         );
     }
