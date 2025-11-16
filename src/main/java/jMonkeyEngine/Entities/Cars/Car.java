@@ -143,6 +143,10 @@ public abstract class Car {
         control.getWheel(1).setFrictionSlip(FastMath.clamp(frontRightFriction, MIN_FRICTION, MAX_FRICTION));
         control.getWheel(2).setFrictionSlip(FastMath.clamp(backLeftFriction, MIN_FRICTION, MAX_FRICTION));
         control.getWheel(3).setFrictionSlip(FastMath.clamp(backRightFriction, MIN_FRICTION, MAX_FRICTION));
+//        if (car.listWheels().length == 4) {
+//            control.getWheel(3)
+//                    .setFrictionSlip(FastMath.clamp(backRightFriction, MIN_FRICTION, MAX_FRICTION));
+//        }
     }
 
     public void move(float velocity, float speed) {
