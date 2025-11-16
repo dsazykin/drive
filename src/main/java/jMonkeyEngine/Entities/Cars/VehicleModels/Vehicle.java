@@ -1,33 +1,22 @@
-package jMonkeyEngine.Entities;
+package jMonkeyEngine.Entities.Cars.VehicleModels;
 
-import com.jme3.anim.AnimComposer;
-import com.jme3.app.state.AppStateManager;
 import com.jme3.asset.AssetManager;
 import com.jme3.asset.AssetNotFoundException;
-import com.jme3.bounding.BoundingBox;
 import com.jme3.bullet.PhysicsSpace;
 import com.jme3.bullet.PhysicsTickListener;
-import com.jme3.bullet.animation.RagUtils;
-import com.jme3.bullet.collision.PhysicsCollisionObject;
-import com.jme3.bullet.collision.PhysicsRayTestResult;
 import com.jme3.bullet.collision.shapes.CollisionShape;
 import com.jme3.bullet.control.VehicleControl;
-import com.jme3.bullet.joints.PhysicsJoint;
-import com.jme3.bullet.objects.PhysicsRigidBody;
-import com.jme3.bullet.objects.PhysicsVehicle;
 import com.jme3.bullet.objects.VehicleWheel;
-import com.jme3.bullet.objects.infos.RigidBodyMotionState;
 import com.jme3.bullet.util.CollisionShapeFactory;
-import com.jme3.math.FastMath;
 import com.jme3.math.Matrix3f;
-import com.jme3.math.Quaternion;
 import com.jme3.math.Transform;
 import com.jme3.math.Vector3f;
-import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
+import jMonkeyEngine.Entities.Cars.CarComponents.Steering;
+import jMonkeyEngine.Entities.Cars.CarComponents.Suspension;
+import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.Wheel;
+import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.WheelModel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -46,15 +35,15 @@ abstract public class Vehicle
     // constants and loggers
 
     /**
-     * factor to convert km/hr to miles per hour
+     * factor to convert km/hr to miles per hour.
      */
     final public static float KPH_TO_MPH = 0.62137f;
     /**
-     * factor to convert km/hr to wu/sec
+     * factor to convert km/hr to wu/sec.
      */
     final public static float KPH_TO_WUPS = 0.277778f;
     /**
-     * message logger for this class
+     * message logger for this class.
      */
     final public static Logger logger
             = Logger.getLogger(Vehicle.class.getName());
@@ -62,52 +51,51 @@ abstract public class Vehicle
     // fields
 
     /**
-     * linear damping due to air resistance on the chassis (&ge;0, &lt;1)
+     * linear damping due to air resistance on the chassis (&ge;0, &lt;1).
      */
     private float chassisDamping;
     /**
-     * the fraction of the total mass in each body (each element &ge;0, &le;1)
+     * the fraction of the total mass in each body (each element &ge;0, &le;1).
      * or null if not determined yet
      */
     private float[] massFractions;
     /**
-     * ratio of the steeringWheelAngle to the turn angle of any wheels used for
-     * steering
+     * ratio of the steeringWheelAngle to the turn angle of any wheels used for steering.
      */
     private float steeringRatio = 2f;
     /**
      * rotation of the steering wheel, handlebars, or tiller (in radians,
-     * negative&rarr;left, 0&rarr;neutral, positive&rarr;right)
+     * negative&rarr;left, 0&rarr;neutral, positive&rarr;right).
      */
     private float steeringWheelAngle;
     /**
-     * physics body associated with the Engine
+     * physics body associated with the Engine.
      */
     private VehicleControl engineBody;
     /**
-     * support the chassis and configure acceleration, steering, and braking
+     * support the chassis and configure acceleration, steering, and braking.
      */
     final private List<Wheel> wheels = new ArrayList<>(4);
     /**
-     * temporary storage for the vehicle's orientation
+     * temporary storage for the vehicle's orientation.
      */
     final private static Matrix3f tmpOrientation = new Matrix3f();
     /**
-     * scene-graph subtree that represents this Vehicle
+     * scene-graph subtree that represents this Vehicle.
      */
     final private Node node;
     /**
      * computer-graphics (C-G) model to visualize the whole Vehicle except for
-     * its wheels
+     * its wheels.
      */
     private Spatial chassis;
     /**
-     * descriptive name (not null)
+     * descriptive name (not null).
      */
     final private String name;
     /**
      * default transform of each body relative to the engine body, or null if
-     * transforms have not yet been determined
+     * transforms have not yet been determined.
      */
     private Transform[] relativeTransforms;
     // *************************************************************************

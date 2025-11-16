@@ -1,4 +1,4 @@
-package jMonkeyEngine.Entities;
+package jMonkeyEngine.Entities.Cars.CarComponents.Wheel;
 
 import com.jme3.asset.AssetManager;
 import com.jme3.scene.Spatial;

@@ -1,4 +1,4 @@
-package jMonkeyEngine.Entities;
+package jMonkeyEngine.Entities.Cars.CarComponents;
 
 import com.jme3.bullet.objects.VehicleWheel;
 import com.jme3.math.FastMath;

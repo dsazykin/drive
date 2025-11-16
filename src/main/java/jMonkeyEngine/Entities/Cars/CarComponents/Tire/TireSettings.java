@@ -1,4 +1,4 @@
-package jMonkeyEngine.Entities;
+package jMonkeyEngine.Entities.Cars.CarComponents.Tire;
 
 /**
  * Derived from the TyreSettings class in the Advanced Vehicles project.

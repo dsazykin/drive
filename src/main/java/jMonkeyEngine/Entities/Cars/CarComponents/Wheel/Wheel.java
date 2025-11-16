@@ -1,12 +1,11 @@
-package jMonkeyEngine.Entities;
+package jMonkeyEngine.Entities.Cars.CarComponents.Wheel;
 
-import com.jme3.bullet.PhysicsSpace;
 import com.jme3.bullet.objects.PhysicsVehicle;
 import com.jme3.bullet.objects.VehicleWheel;
-import com.jme3.math.ColorRGBA;
-import com.jme3.math.FastMath;
-import com.jme3.math.Quaternion;
-import com.jme3.math.Vector3f;
+import jMonkeyEngine.Entities.Cars.CarComponents.Tire.PacejkaTireModel;
+import jMonkeyEngine.Entities.Cars.CarComponents.Steering;
+import jMonkeyEngine.Entities.Cars.CarComponents.Suspension;
+import jMonkeyEngine.Entities.Cars.VehicleModels.Vehicle;
 import java.util.logging.Logger;
 
 /**
