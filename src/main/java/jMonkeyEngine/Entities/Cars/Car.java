@@ -62,14 +62,6 @@ public abstract class Car {
         public PhysicsConfig(float maxSpeed, float accelerationConstant,
                            float maxReverse, float reverseConstant,
                            float wheelBase, float trackWidth,
-                           float cgHeight, float mass) {
-            this(maxSpeed, accelerationConstant, maxReverse, reverseConstant,
-                 wheelBase, trackWidth, cgHeight, mass, 0.31f, 2.0f, 0.015f);
-        }
-
-        public PhysicsConfig(float maxSpeed, float accelerationConstant,
-                           float maxReverse, float reverseConstant,
-                           float wheelBase, float trackWidth,
                            float cgHeight, float mass,
                            float dragCoefficient, float frontalArea,
                            float rollingResistanceCoefficient) {

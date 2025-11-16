@@ -8,17 +8,17 @@ public class Pickup extends Car {
     public Pickup(AssetManager assetManager, PhysicsSpace physicsSpace, PickupTruck car) {
         super(assetManager, physicsSpace, car,
               new PhysicsConfig(
-                      320f / 3.6f,        // maxSpeed
-                      0.1387753516f,      // accelerationConstant
-                      16.667f,            // maxReverse
-                      0.287534238854f,    // reverseConstant
-                      2.78f,              // wheelBase
-                      1.6f,               // trackWidth
-                      0.5f,               // cgHeight
-                      1735,               // mass
-                      0.26f,               // dragCoefficient
-                      2.15f,               // frontalArea
-                      0.015f              // rollingResistanceCoefficient
+                      171f / 3.6f,        // maxSpeed
+                      0.1311915939f,      // accelerationConstant
+                      7.0f,               // maxReverse
+                      0.5f,               // reverseConstant
+                      3.27f,              // wheelBase
+                      1.62f,              // trackWidth
+                      0.8f,               // cgHeight
+                      2002,               // mass
+                      0.40f,              // dragCoefficient
+                      2.97f,              // frontalArea
+                      0.018f              // rollingResistanceCoefficient
               )
         );
     }
