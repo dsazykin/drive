@@ -9,9 +9,9 @@ public class RoadGenerator {
 
     private List<int[]> generateOffsets(int radius) {
         List<int[]> offsets = new ArrayList<>();
-        for (int dx = -radius; dx <= radius; dx++) {
+        // Only generate forward-moving offsets (dx > 0) to ensure road moves away from origin
+        for (int dx = 1; dx <= radius; dx++) {
             for (int dy = -radius; dy <= radius; dy++) {
-                if (dx == 0 && dy == 0) continue;
                 double dist = Math.sqrt(dx * dx + dy * dy);
                 if (Math.abs(dist - radius) < 0.5) {
                     offsets.add(new int[]{dx, dy});
@@ -35,7 +35,7 @@ public class RoadGenerator {
 
         while (!openSet.isEmpty()) {
             Node current = openSet.poll();
-            if (current.x == goalX) {
+            if (current.x >= goalX) {
                 return reconstructPath(current);
             }
 
@@ -59,18 +59,31 @@ public class RoadGenerator {
                         cosAngle = 1;
                     }
 
-                    if (cosAngle > 0) {
-                        float heightWeight = 10000.0f * (rows * 2);
-
-                        float heightDiff = Math.abs(heightmap[current.x][current.y] - heightmap[nx][ny]);
+                    // Allow forward movement (cosAngle check is now less restrictive since we only generate forward offsets)
+                    if (cosAngle > -0.5) {
+                        // Improved height following: penalize steep changes but favor following contours
+                        float currentHeight = heightmap[current.x][current.y];
+                        float nextHeight = heightmap[nx][ny];
+                        float heightDiff = Math.abs(currentHeight - nextHeight);
+                        
+                        // Calculate slope direction relative to movement direction
+                        float slopeGradient = nextHeight - currentHeight;
+                        
+                        // Heavy penalty for steep gradients (going across terrain)
+                        float heightPenalty = heightDiff * heightDiff * 50000.0f;
+                        
+                        // Additional penalty for sudden elevation changes
+                        if (heightDiff > 0.05f) {
+                            heightPenalty *= 3.0f;
+                        }
 
                         float distance = (float) Math.sqrt(dx * dx + dy * dy);
                         float baseCost = distance * 10f;
 
-                        float moveCost = baseCost + (heightWeight * heightDiff);
+                        // Penalize sharp turns to create smoother roads
+                        float turnPenalty = (1 - cosAngle) * 500f;
 
-                        //                        float angleCos = (mag1 == 0 || mag2 == 0) ? 1 : dot / (mag1 * mag2);
-                        //                        float anglePenalty = (1 - angleCos) * -10; // more penalty for sharper turns
+                        float moveCost = baseCost + heightPenalty + turnPenalty;
 
                         float tentativeG = current.gCost + moveCost;
 

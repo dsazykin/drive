@@ -51,12 +51,13 @@ public class HeightMapGenerator {
     }
 
     public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath) {
-        float roadWidth = 6f;
+        float roadWidth = 8f;  // Increased width for better flattening
         float halfWidth = roadWidth / 2f;
 
         float[][] targetHeights = new float[heightmap.length][heightmap[0].length];
         boolean[][] hasTarget = new boolean[heightmap.length][heightmap[0].length];
 
+        // First pass: calculate target heights along the road path
         for (int i = 0; i < roadPath.size() - 1; i++) {
             Node a = roadPath.get(i);
             Node b = roadPath.get(i + 1);
@@ -86,28 +87,31 @@ public class HeightMapGenerator {
                 if (rightH != 0) count++;
                 float currHeight = (leftH + rightH) / count + 2;
 
+                // Smoother transition between road segments
                 if (prevHeight != Float.MAX_VALUE) {
-                    currHeight = prevHeight * 0.98f + currHeight * 0.02f;
+                    currHeight = prevHeight * 0.95f + currHeight * 0.05f;
                 }
 
                 prevHeight = currHeight;
                 float targetHeight = currHeight;
 
-                for (float offset = -halfWidth; offset <= halfWidth; offset += 1f) {
-                    float ix = Math.round(cx + px * offset);
-                    float iz = Math.round(cz + pz * offset);
+                // Apply height to all points within road width
+                for (float offset = -halfWidth; offset <= halfWidth; offset += 0.5f) {
+                    float ix = cx + px * offset;
+                    float iz = cz + pz * offset;
 
                     int x = Math.round(ix);
                     int z = Math.round(iz);
                     if (x < 0 || z < 0 || x >= heightmap.length || z >= heightmap[0].length) continue;
-                    if (hasTarget[x][z]) continue;
 
+                    // Always update to ensure flatness (remove the hasTarget check here)
                     targetHeights[x][z] = targetHeight;
                     hasTarget[x][z] = true;
                 }
             }
         }
 
+        // Apply target heights directly to ensure flatness
         for (int x = 0; x < heightmap.length; x++) {
             for (int z = 0; z < heightmap[0].length; z++) {
                 if (hasTarget[x][z]) {
@@ -116,7 +120,10 @@ public class HeightMapGenerator {
             }
         }
 
-        smoothRoad(heightmap, hasTarget, targetHeights);
+        // Multiple smoothing passes for better flatness
+        for (int pass = 0; pass < 3; pass++) {
+            smoothRoad(heightmap, hasTarget, targetHeights);
+        }
 
         blendTerrain(heightmap, hasTarget, targetHeights);
     }
