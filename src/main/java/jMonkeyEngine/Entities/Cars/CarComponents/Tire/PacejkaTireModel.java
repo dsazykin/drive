@@ -1,4 +1,4 @@
-package jMonkeyEngine.Entities;
+package jMonkeyEngine.Entities.Cars.CarComponents.Tire;
 
 import com.jme3.math.FastMath;
 

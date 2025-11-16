@@ -1,26 +1,12 @@
-package jMonkeyEngine.Entities;
+package jMonkeyEngine.Entities.Cars;
 
-import com.jme3.app.SimpleApplication;
 import com.jme3.asset.AssetManager;
-import com.jme3.asset.AssetNotFoundException;
-import com.jme3.bounding.BoundingBox;
 import com.jme3.bullet.PhysicsSpace;
-import com.jme3.bullet.collision.shapes.CollisionShape;
 import com.jme3.bullet.control.VehicleControl;
-import com.jme3.bullet.objects.VehicleWheel;
-import com.jme3.bullet.util.CollisionShapeFactory;
-import com.jme3.material.Material;
-import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
-import com.jme3.math.Vector3f;
-import com.jme3.renderer.queue.RenderQueue;
-import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
-import com.jme3.scene.Spatial;
-import com.jme3.scene.debug.Arrow;
-import jMonkeyEngine.Main;
-import java.util.ArrayList;
-import java.util.List;
+import jMonkeyEngine.Entities.Cars.VehicleModels.Nismo;
+import jMonkeyEngine.Entities.Cars.VehicleModels.Vehicle;
 
 public class Gtr {
     private final VehicleControl control;

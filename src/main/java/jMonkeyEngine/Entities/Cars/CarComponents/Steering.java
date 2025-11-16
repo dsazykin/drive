@@ -1,4 +1,4 @@
-package jMonkeyEngine.Entities;
+package jMonkeyEngine.Entities.Cars.CarComponents;
 
 /**
  * Enumerate the ways a steering system can relate to a specific wheel.

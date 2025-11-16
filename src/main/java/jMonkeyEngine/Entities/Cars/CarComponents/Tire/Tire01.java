@@ -1,4 +1,4 @@
-package jMonkeyEngine.Entities;
+package jMonkeyEngine.Entities.Cars.CarComponents.Tire;
 
 import java.util.logging.Logger;
 

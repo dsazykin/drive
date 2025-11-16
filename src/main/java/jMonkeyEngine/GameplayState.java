@@ -24,7 +24,7 @@ import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
-import jMonkeyEngine.Entities.Gtr;
+import jMonkeyEngine.Entities.Cars.Gtr;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 import java.util.List;
