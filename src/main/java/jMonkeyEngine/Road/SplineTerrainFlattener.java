@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * Spline-based road terrain modifier that flattens terrain along the road path.
- * More efficient than point-by-point flattening.
+ * Optimized for performance with on-the-fly calculations.
  */
 public class SplineTerrainFlattener {
     
@@ -14,7 +14,7 @@ public class SplineTerrainFlattener {
     
     /**
      * Apply road flattening to a heightmap using spline-based road points.
-     * This is much more efficient than plotting thousands of individual points.
+     * Optimized version that only processes cells near the road.
      * 
      * @param heightmap The terrain heightmap to modify
      * @param roadPoints List of Vector3f points along the road spline
@@ -31,32 +31,32 @@ public class SplineTerrainFlattener {
         int rows = heightmap.length;
         int cols = heightmap[0].length;
         
-        // Create a distance field for efficient road influence calculation
-        float[][] roadHeights = new float[rows][cols];
-        float[][] distanceToRoad = new float[rows][cols];
+        float maxInfluenceDistance = ROAD_WIDTH / 2 + BLEND_DISTANCE;
         
-        // Initialize with max distance
-        for (int x = 0; x < rows; x++) {
-            for (int z = 0; z < cols; z++) {
-                distanceToRoad[x][z] = Float.MAX_VALUE;
-                roadHeights[x][z] = 0;
-            }
-        }
-        
-        // For each point in the heightmap, find distance to nearest road point
+        // Optimized: Process on-the-fly without creating large arrays
         for (int x = 0; x < rows; x++) {
             for (int z = 0; z < cols; z++) {
                 // Convert heightmap coordinates to world coordinates
                 float worldX = chunkWorldX + x * worldScale;
                 float worldZ = chunkWorldZ + z * worldScale;
                 
-                // Find closest point on the road
+                // Find closest point on the road (only check nearby segments)
                 float minDist = Float.MAX_VALUE;
                 float closestRoadHeight = 0;
                 
                 for (int i = 0; i < roadPoints.size() - 1; i++) {
                     Vector3f p1 = roadPoints.get(i);
                     Vector3f p2 = roadPoints.get(i + 1);
+                    
+                    // Quick bounding box check for optimization
+                    float minX = Math.min(p1.x, p2.x) - maxInfluenceDistance;
+                    float maxX = Math.max(p1.x, p2.x) + maxInfluenceDistance;
+                    float minZ = Math.min(p1.z, p2.z) - maxInfluenceDistance;
+                    float maxZ = Math.max(p1.z, p2.z) + maxInfluenceDistance;
+                    
+                    if (worldX < minX || worldX > maxX || worldZ < minZ || worldZ > maxZ) {
+                        continue;  // Skip segments too far away
+                    }
                     
                     // Calculate distance from point to line segment
                     float dist = pointToSegmentDistance(worldX, worldZ, p1.x, p1.z, p2.x, p2.z);
@@ -69,34 +69,26 @@ public class SplineTerrainFlattener {
                     }
                 }
                 
-                distanceToRoad[x][z] = minDist;
-                roadHeights[x][z] = closestRoadHeight;
-            }
-        }
-        
-        // Apply flattening with smooth blending
-        for (int x = 0; x < rows; x++) {
-            for (int z = 0; z < cols; z++) {
-                float dist = distanceToRoad[x][z];
-                
-                if (dist < ROAD_WIDTH / 2) {
-                    // Within road width - completely flat
-                    heightmap[x][z] = roadHeights[x][z];
-                } else if (dist < ROAD_WIDTH / 2 + BLEND_DISTANCE) {
-                    // In blend zone - interpolate between road height and natural terrain
-                    float blendFactor = (dist - ROAD_WIDTH / 2) / BLEND_DISTANCE;
-                    blendFactor = smoothstep(blendFactor);  // Smooth S-curve blending
-                    
-                    float originalHeight = heightmap[x][z];
-                    heightmap[x][z] = roadHeights[x][z] * (1 - blendFactor) + 
-                                     originalHeight * blendFactor;
+                // Only apply flattening if within influence distance
+                if (minDist < maxInfluenceDistance) {
+                    if (minDist < ROAD_WIDTH / 2) {
+                        // Within road width - completely flat at road height
+                        heightmap[x][z] = closestRoadHeight;
+                    } else {
+                        // In blend zone - interpolate between road height and natural terrain
+                        float blendFactor = (minDist - ROAD_WIDTH / 2) / BLEND_DISTANCE;
+                        blendFactor = smoothstep(blendFactor);  // Smooth S-curve blending
+                        
+                        float originalHeight = heightmap[x][z];
+                        heightmap[x][z] = closestRoadHeight * (1 - blendFactor) + 
+                                         originalHeight * blendFactor;
+                    }
                 }
-                // Beyond blend distance - leave terrain unchanged
             }
         }
         
-        // Apply smoothing pass to the road area for better quality
-        smoothRoadArea(heightmap, distanceToRoad, ROAD_WIDTH / 2);
+        // Apply a simple smoothing pass to the modified areas
+        smoothRoadAreas(heightmap, roadPoints, chunkWorldX, chunkWorldZ, worldScale);
     }
     
     /**
@@ -145,24 +137,42 @@ public class SplineTerrainFlattener {
     }
     
     /**
-     * Apply smoothing to the road area for better quality
+     * Apply simple smoothing to areas near the road
      */
-    private static void smoothRoadArea(float[][] heightmap, float[][] distanceToRoad, float roadRadius) {
+    private static void smoothRoadAreas(float[][] heightmap, List<Vector3f> roadPoints,
+                                        float chunkWorldX, float chunkWorldZ, float worldScale) {
         int rows = heightmap.length;
         int cols = heightmap[0].length;
         float[][] smoothed = new float[rows][cols];
         
+        // Copy original
         for (int x = 0; x < rows; x++) {
             for (int z = 0; z < cols; z++) {
                 smoothed[x][z] = heightmap[x][z];
             }
         }
         
-        // Apply smoothing only to road area
+        // Apply light smoothing only near road
+        float smoothRadius = ROAD_WIDTH;
+        
         for (int x = 1; x < rows - 1; x++) {
             for (int z = 1; z < cols - 1; z++) {
-                if (distanceToRoad[x][z] < roadRadius) {
-                    // Simple box blur for smoothing
+                float worldX = chunkWorldX + x * worldScale;
+                float worldZ = chunkWorldZ + z * worldScale;
+                
+                // Quick check if near any road point
+                boolean nearRoad = false;
+                for (Vector3f point : roadPoints) {
+                    float dx = worldX - point.x;
+                    float dz = worldZ - point.z;
+                    if (dx * dx + dz * dz < smoothRadius * smoothRadius) {
+                        nearRoad = true;
+                        break;
+                    }
+                }
+                
+                if (nearRoad) {
+                    // Simple 3x3 box blur
                     float sum = 0;
                     int count = 0;
                     
@@ -181,9 +191,7 @@ public class SplineTerrainFlattener {
         // Copy smoothed values back
         for (int x = 0; x < rows; x++) {
             for (int z = 0; z < cols; z++) {
-                if (distanceToRoad[x][z] < roadRadius) {
-                    heightmap[x][z] = smoothed[x][z];
-                }
+                heightmap[x][z] = smoothed[x][z];
             }
         }
     }

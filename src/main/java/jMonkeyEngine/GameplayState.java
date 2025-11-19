@@ -69,7 +69,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
     private boolean followCam = false;
     private boolean gui = false;
 
-    private final int CHUNK_SIZE = 1000;
+    private final int CHUNK_SIZE = 200;  // Reduced from 1000 for better performance
     private final float SCALE = 40f;
     private long SEED;
 
@@ -113,15 +113,16 @@ public class GameplayState extends BaseAppState implements ActionListener {
         jMonkeyEngine.Road.SplineRoadGenerator splineRoad = 
             new jMonkeyEngine.Road.SplineRoadGenerator(SEED);
         
+        // Simplified: use same size for both chunk parameters (no parent/child system)
         generator = new TerrainGenerator(bulletAppState, gameplayRoot, assetManager, road, splineRoad, sapp, executor,
-                                         200, CHUNK_SIZE, SCALE, SEED, 200);
+                                         CHUNK_SIZE, CHUNK_SIZE, SCALE, SEED, 200);
         
         // Initialize spline road with some control points
         splineRoad.extendRoad(50, generator.getTerrainSampler());
         
         this.manager =
                 new ChunkManager(bulletAppState, gameplayRoot, road, generator, sapp, executor,
-                                 200, CHUNK_SIZE, SCALE, 2);
+                                 CHUNK_SIZE, CHUNK_SIZE, SCALE, 2);
         generator.setChunkManager(manager);
 
         loadScene();
