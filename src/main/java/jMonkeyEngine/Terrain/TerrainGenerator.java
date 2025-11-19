@@ -17,6 +17,8 @@ import com.jme3.util.BufferUtils;
 import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Road.RoadGenerator;
+import jMonkeyEngine.Road.SplineRoadGenerator;
+import jMonkeyEngine.Road.SplineTerrainFlattener;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +34,7 @@ public class TerrainGenerator{
     private final HeightMapGenerator heightMap;
     private ChunkManager manager;
     private final RoadGenerator road;
+    private final SplineRoadGenerator splineRoad;
     private final SimpleApplication main;
     private final ExecutorService executor;
 
@@ -47,10 +50,19 @@ public class TerrainGenerator{
                             Node rootNode, AssetManager assetManager, RoadGenerator road, SimpleApplication main,
                             ExecutorService executor, int chunkSize, int parentSize, float SCALE, Long seed,
                             int maxHeight) {
+        this(bulletAppState, rootNode, assetManager, road, null, main, executor, chunkSize, parentSize, SCALE, seed, maxHeight);
+    }
+    
+    public TerrainGenerator(BulletAppState bulletAppState,
+                            Node rootNode, AssetManager assetManager, RoadGenerator road, 
+                            SplineRoadGenerator splineRoad, SimpleApplication main,
+                            ExecutorService executor, int chunkSize, int parentSize, float SCALE, Long seed,
+                            int maxHeight) {
         this.bulletAppState = bulletAppState;
         this.rootNode = rootNode;
         this.assetManager = assetManager;
         this.road = road;
+        this.splineRoad = splineRoad;
         this.main = main;
         this.executor = executor;
         this.CHUNK_SIZE = chunkSize;
@@ -71,6 +83,31 @@ public class TerrainGenerator{
 
     public void updateHeightMap(float[][] terrain, List<jMonkeyEngine.Road.Node> pathPoints) {
         heightMap.applyRoadFlattening(terrain, pathPoints);
+    }
+    
+    /**
+     * Apply spline-based road flattening to terrain
+     */
+    public void updateHeightMapWithSpline(float[][] terrain, List<Vector3f> roadPoints, 
+                                          float chunkWorldX, float chunkWorldZ) {
+        SplineTerrainFlattener.flattenTerrainAlongSpline(
+            terrain, roadPoints, chunkWorldX, chunkWorldZ, PARENT_SIZE, SCALE / 16
+        );
+    }
+    
+    /**
+     * Get terrain height sampler for spline road generation
+     */
+    public SplineRoadGenerator.TerrainHeightSampler getTerrainSampler() {
+        return (x, z) -> heightMap.sampleTerrainHeight(x, z);
+    }
+    
+    public boolean useSplineRoad() {
+        return splineRoad != null;
+    }
+    
+    public SplineRoadGenerator getSplineRoad() {
+        return splineRoad;
     }
 
     public Mesh generateChunkMesh(float[][] terrain, int cx, int cz){

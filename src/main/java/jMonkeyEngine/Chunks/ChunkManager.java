@@ -85,14 +85,55 @@ public class ChunkManager {
                             if (!generatedHeightmaps.containsKey(parent) && !loadingHeightmaps.contains(parent)) {
                                 loadingHeightmaps.add(parent);
                                 float[][] terrain = generator.generateHeightMap(parent);
-                                if (parent.z == 0 && parent.x == road.currentXChunk) {
-                                    List<jMonkeyEngine.Road.Node> pathPoints =
-                                            road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
-                                                                      PARENT_SIZE - 1,
-                                                                      PARENT_SIZE / 2);
-                                    generator.updateHeightMap(terrain, pathPoints);
-                                    generatedRoads.put(parent, pathPoints);
+                                
+                                // Use spline road if available, otherwise use old A* system
+                                if (generator.useSplineRoad()) {
+                                    // Calculate world coordinates for this parent chunk
+                                    float parentWorldX = parent.x * PARENT_SIZE * (SCALE / 16);
+                                    float parentWorldZ = parent.z * PARENT_SIZE * (SCALE / 16);
+                                    float parentWorldWidth = PARENT_SIZE * (SCALE / 16);
+                                    
+                                    // Extend road if needed to cover this chunk
+                                    float requiredX = parentWorldX + parentWorldWidth;
+                                    if (!generator.getSplineRoad().hasReached(requiredX)) {
+                                        int pointsNeeded = (int) Math.ceil((requiredX - generator.getSplineRoad().getFurthestX()) / 100f);
+                                        generator.getSplineRoad().extendRoad(pointsNeeded + 5, generator.getTerrainSampler());
+                                    }
+                                    
+                                    // Get road points in this chunk's region (with buffer for blending)
+                                    List<Vector3f> roadPoints = generator.getSplineRoad().getRoadPointsInRegion(
+                                        parentWorldX - 50,
+                                        parentWorldX + parentWorldWidth + 50,
+                                        parentWorldZ - 50,
+                                        parentWorldZ + parentWorldWidth + 50
+                                    );
+                                    
+                                    // Apply spline-based flattening
+                                    generator.updateHeightMapWithSpline(terrain, roadPoints, parentWorldX, parentWorldZ);
+                                    
+                                    // Store road points (convert to Node format for compatibility)
+                                    List<jMonkeyEngine.Road.Node> nodeList = new ArrayList<>();
+                                    for (Vector3f point : roadPoints) {
+                                        // Convert world coordinates back to heightmap indices if needed
+                                        int localX = (int)((point.x - parentWorldX) / (SCALE / 16));
+                                        int localZ = (int)((point.z - parentWorldZ) / (SCALE / 16));
+                                        if (localX >= 0 && localX < PARENT_SIZE && localZ >= 0 && localZ < PARENT_SIZE) {
+                                            nodeList.add(new jMonkeyEngine.Road.Node(localX, localZ, point.y, 0, 0, null));
+                                        }
+                                    }
+                                    generatedRoads.put(parent, nodeList);
+                                } else {
+                                    // Old A* system
+                                    if (parent.z == 0 && parent.x == road.currentXChunk) {
+                                        List<jMonkeyEngine.Road.Node> pathPoints =
+                                                road.getRoadPointsInChunk(terrain, 0, road.lastZCoord,
+                                                                          PARENT_SIZE - 1,
+                                                                          PARENT_SIZE / 2);
+                                        generator.updateHeightMap(terrain, pathPoints);
+                                        generatedRoads.put(parent, pathPoints);
+                                    }
                                 }
+                                
                                 generatedHeightmaps.put(parent, terrain);
                                 loadingHeightmaps.remove(parent);
                             }

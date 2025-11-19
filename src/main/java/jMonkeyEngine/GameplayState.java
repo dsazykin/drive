@@ -108,8 +108,17 @@ public class GameplayState extends BaseAppState implements ActionListener {
         bulletAppState.setEnabled(false);
 
         road = new RoadGenerator();
-        generator = new TerrainGenerator(bulletAppState, gameplayRoot, assetManager, road, sapp, executor,
+        
+        // Create new spline-based road generator
+        jMonkeyEngine.Road.SplineRoadGenerator splineRoad = 
+            new jMonkeyEngine.Road.SplineRoadGenerator(SEED);
+        
+        generator = new TerrainGenerator(bulletAppState, gameplayRoot, assetManager, road, splineRoad, sapp, executor,
                                          200, CHUNK_SIZE, SCALE, SEED, 200);
+        
+        // Initialize spline road with some control points
+        splineRoad.extendRoad(50, generator.getTerrainSampler());
+        
         this.manager =
                 new ChunkManager(bulletAppState, gameplayRoot, road, generator, sapp, executor,
                                  200, CHUNK_SIZE, SCALE, 2);

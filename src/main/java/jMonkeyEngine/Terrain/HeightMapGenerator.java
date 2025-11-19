@@ -49,6 +49,23 @@ public class HeightMapGenerator {
 
         return heightmap;
     }
+    
+    /**
+     * Sample terrain height at arbitrary world coordinates (for road generation)
+     */
+    public float sampleTerrainHeight(float worldX, float worldZ) {
+        // Same noise calculation as in generateHeightmap, but for single point
+        double wx = worldX / SCALE;
+        double wz = worldZ / SCALE;
+        
+        float e = 40f * OpenSimplex2.noise2(SEED, 0.05f * (float)wx, 0.05f * (float)wz) +
+                6f * OpenSimplex2.noise2(SEED, 0.25f * (float)wx, 0.25f * (float)wz) +
+                0.9f * OpenSimplex2.noise2(SEED, 0.5f * (float)wx, 0.5f * (float)wz) +
+                0.6f * OpenSimplex2.noise2(SEED, 0.75f * (float)wx, 0.75f * (float)wz);
+        e = e / (40f + 6f + 0.9f + 0.6f);
+        e = (e + 1f) / 2f;
+        return FastMath.pow(e, 0.8f);
+    }
 
     public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath) {
         float roadWidth = 6f;
