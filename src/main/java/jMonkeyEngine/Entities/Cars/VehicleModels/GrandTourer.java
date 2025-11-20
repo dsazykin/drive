@@ -4,6 +4,7 @@ import com.jme3.asset.AssetManager;
 import com.jme3.bullet.PhysicsSpace;
 import com.jme3.bullet.control.VehicleControl;
 import com.jme3.math.Vector3f;
+import jMonkeyEngine.Entities.Cars.Car;
 import jMonkeyEngine.Entities.Cars.CarComponents.Steering;
 import jMonkeyEngine.Entities.Cars.CarComponents.Suspension;
 import jMonkeyEngine.Entities.Cars.CarComponents.Tire.Tire01;
@@ -17,7 +18,7 @@ import java.util.logging.Logger;
  * An example Vehicle, built around Thomas Glenn Thorne's "Opel GT Retopo"
  * model.
  */
-public class GrandTourer extends Vehicle {
+public class GrandTourer extends Car {
     // *************************************************************************
     // constants and loggers
 
@@ -30,7 +31,19 @@ public class GrandTourer extends Vehicle {
     // constructors
 
     public GrandTourer() {
-        super("Grand Tourer");
+        super("Grand Tourer", new PhysicsConfig(
+                220f / 3.6f,        // maxSpeed
+                0.0932516621f,      // accelerationConstant
+                13.8f,              // maxReverse
+                0.19321187354f,     // reverseConstant
+                2.415f,             // wheelBase
+                1.267f,             // trackWidth
+                0.49f,              // cgHeight
+                970,                // mass
+                0.39f,              // dragCoefficient
+                1.65f,              // frontalArea
+                0.012f              // rollingResistanceCoefficient
+        ));
     }
     // *************************************************************************
     // Vehicle methods

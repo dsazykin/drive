@@ -3,6 +3,7 @@ package jMonkeyEngine.Entities.Cars.VehicleModels;
 import com.jme3.asset.AssetManager;
 import com.jme3.bullet.PhysicsSpace;
 import com.jme3.math.Vector3f;
+import jMonkeyEngine.Entities.Cars.Car;
 import jMonkeyEngine.Entities.Cars.CarComponents.Steering;
 import jMonkeyEngine.Entities.Cars.CarComponents.Suspension;
 import jMonkeyEngine.Entities.Cars.CarComponents.Tire.Tire01;
@@ -15,7 +16,7 @@ import java.util.logging.Logger;
 /**
  * An example Vehicle, built around mauro.zampaoli's "Ford Ranger" model.
  */
-public class PickupTruck extends Vehicle {
+public class PickupTruck extends Car {
     // *************************************************************************
     // constants and loggers
 
@@ -28,7 +29,19 @@ public class PickupTruck extends Vehicle {
     // constructors
 
     public PickupTruck() {
-        super("Pickup Truck");
+        super("Pickup Truck", new PhysicsConfig(
+                171f / 3.6f,        // maxSpeed
+                0.1311915939f,      // accelerationConstant
+                7.0f,               // maxReverse
+                0.5f,               // reverseConstant
+                3.27f,              // wheelBase
+                1.62f,              // trackWidth
+                0.8f,               // cgHeight
+                2002,               // mass
+                0.40f,              // dragCoefficient
+                2.97f,              // frontalArea
+                0.018f              // rollingResistanceCoefficient
+        ));
     }
     // *************************************************************************
     // Vehicle methods

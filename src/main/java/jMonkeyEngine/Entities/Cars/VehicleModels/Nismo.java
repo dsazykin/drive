@@ -3,6 +3,7 @@ package jMonkeyEngine.Entities.Cars.VehicleModels;
 import com.jme3.asset.AssetManager;
 import com.jme3.bullet.PhysicsSpace;
 import com.jme3.math.Vector3f;
+import jMonkeyEngine.Entities.Cars.Car;
 import jMonkeyEngine.Entities.Cars.CarComponents.Steering;
 import jMonkeyEngine.Entities.Cars.CarComponents.Suspension;
 import jMonkeyEngine.Entities.Cars.CarComponents.Tire.Tire01;
@@ -14,7 +15,7 @@ import java.util.logging.Logger;
 /**
  * An example Vehicle, built around iSteven's "Nissan GT-R" model.
  */
-public class Nismo extends Vehicle {
+public class Nismo extends Car {
     // *************************************************************************
     // constants and loggers
 
@@ -27,7 +28,19 @@ public class Nismo extends Vehicle {
     // constructors
 
     public Nismo() {
-        super("Nismo");
+        super("Nismo", new PhysicsConfig(
+                320f / 3.6f,        // maxSpeed
+                0.1387753516f,      // accelerationConstant
+                16.667f,            // maxReverse
+                0.287534238854f,    // reverseConstant
+                2.78f,              // wheelBase
+                1.6f,               // trackWidth
+                0.5f,               // cgHeight
+                1735,               // mass
+                0.26f,               // dragCoefficient
+                2.15f,               // frontalArea
+                0.015f              // rollingResistanceCoefficient
+        ));
     }
     // *************************************************************************
     // Vehicle methods

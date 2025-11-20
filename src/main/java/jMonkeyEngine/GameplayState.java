@@ -405,7 +405,11 @@ public class GameplayState extends BaseAppState implements ActionListener {
     }
 
     private void initCar() {
-        car = new HCR2_Rotator(sapp.getAssetManager(), bulletAppState.getPhysicsSpace(), new Rotator());
+        car = new Nismo();
+        car.load(sapp.getAssetManager());
+        bulletAppState.getPhysicsSpace().add(car.getVehicleControl());
+        bulletAppState.getPhysicsSpace().addTickListener(car);
+
         // Set desired spawn location
         Quaternion rotation = new Quaternion();
         rotation.fromAngleAxis(FastMath.HALF_PI, Vector3f.UNIT_Y);
