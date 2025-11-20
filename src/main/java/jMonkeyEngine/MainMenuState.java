@@ -9,12 +9,16 @@ import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
+import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.renderer.Camera;
 import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
+import com.jme3.texture.Texture2D;
 import com.simsilica.lemur.Button;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.Container;
+import com.simsilica.lemur.component.QuadBackgroundComponent;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
@@ -31,6 +35,13 @@ public class MainMenuState extends BaseAppState {
     private Container carSelectionMenu;
     private Label selectedCarLabel;
 
+    // Car preview
+    private Node carPreviewNode;
+    private Camera previewCam;
+    private com.jme3.renderer.ViewPort previewViewport;
+    private float carRotation = 0f;
+    private Spatial currentCarModel;
+
     private SimpleApplication sapp;
     private Camera cam;
     private AssetManager assetManager;
@@ -44,7 +55,7 @@ public class MainMenuState extends BaseAppState {
 
     private float cameraAngle = 0f;
     private float cameraDistance = 150f;
-    private Vector3f cameraTarget = new Vector3f(0, 50, 0);
+    private Vector3f cameraTarget;
 
     // Car selection
     private String selectedCar = "Nismo";
@@ -95,6 +106,12 @@ public class MainMenuState extends BaseAppState {
         // Generate initial terrain chunks
         generator.CreateTerrain();
 
+        // Set camera target to chunk center
+        float chunkCenterX = 0; // Center of chunk 0,0
+        float chunkCenterZ = (CHUNK_SIZE / 2f) * (SCALE / 16f);
+        float centerHeight = manager.getHeight(200, 0, (int)(chunkCenterZ / (SCALE / 16f)), new jMonkeyEngine.Chunks.ChunkCoord(0, 0));
+        cameraTarget = new Vector3f(chunkCenterX, centerHeight + 20, chunkCenterZ);
+
         // Set sky color
         sapp.getViewPort().setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
     }
@@ -141,6 +158,11 @@ public class MainMenuState extends BaseAppState {
         menu.removeFromParent();
         sapp.getGuiNode().attachChild(carSelectionMenu);
         showingCarSelection = true;
+
+        // Initialize car preview
+        initCarPreview();
+        loadCarPreview(selectedCar);
+
         centerMenu();
     }
 
@@ -162,6 +184,7 @@ public class MainMenuState extends BaseAppState {
             currentCarIndex = (currentCarIndex - 1 + availableCars.length) % availableCars.length;
             selectedCar = availableCars[currentCarIndex];
             selectedCarLabel.setText(selectedCar);
+            loadCarPreview(selectedCar);
         });
 
         Button nextButton = navigationContainer.addChild(new Button("Next >"));
@@ -169,6 +192,7 @@ public class MainMenuState extends BaseAppState {
             currentCarIndex = (currentCarIndex + 1) % availableCars.length;
             selectedCar = availableCars[currentCarIndex];
             selectedCarLabel.setText(selectedCar);
+            loadCarPreview(selectedCar);
         });
 
         Button backButton = carSelectionMenu.addChild(new Button("Back"));
@@ -176,6 +200,7 @@ public class MainMenuState extends BaseAppState {
             carSelectionMenu.removeFromParent();
             sapp.getGuiNode().attachChild(menu);
             showingCarSelection = false;
+            cleanupCarPreview();
             centerMenu();
         });
     }
@@ -193,6 +218,117 @@ public class MainMenuState extends BaseAppState {
         // Rotate camera around the terrain
         cameraAngle += tpf * 0.1f; // Slow rotation
         updateCameraPosition();
+
+        // Rotate car preview if in selection menu
+        if (showingCarSelection && currentCarModel != null) {
+            carRotation += tpf * 0.5f; // Rotate car slowly
+            currentCarModel.setLocalRotation(new Quaternion().fromAngles(0, carRotation, 0));
+        }
+    }
+
+    private void initCarPreview() {
+        if (previewViewport != null) {
+            return; // Already initialized
+        }
+
+        // Create a separate scene for car preview
+        carPreviewNode = new Node("CarPreview");
+
+        // Create preview camera
+        previewCam = new Camera(256, 256);
+        previewCam.setFrustumPerspective(45f, 1f, 0.1f, 100f);
+        previewCam.setLocation(new Vector3f(8, 3, 8));
+        previewCam.lookAt(new Vector3f(0, 1, 0), Vector3f.UNIT_Y);
+
+        // Create viewport for preview
+        previewViewport = sapp.getRenderManager().createMainView("CarPreview", previewCam);
+        previewViewport.setClearFlags(true, true, true);
+        previewViewport.setBackgroundColor(new ColorRGBA(0.2f, 0.2f, 0.3f, 1f));
+        previewViewport.attachScene(carPreviewNode);
+
+        // Add lights to preview scene
+        AmbientLight al = new AmbientLight();
+        al.setColor(ColorRGBA.White.mult(0.8f));
+        carPreviewNode.addLight(al);
+
+        DirectionalLight dl = new DirectionalLight();
+        dl.setColor(ColorRGBA.White);
+        dl.setDirection(new Vector3f(-1, -1, -1).normalizeLocal());
+        carPreviewNode.addLight(dl);
+
+        // Create a picture element to display the preview
+        Texture2D previewTexture = new Texture2D(256, 256, com.jme3.texture.Image.Format.RGBA8);
+        previewViewport.setOutputFrameBuffer(null);
+
+        // Position preview on screen (top right area)
+        com.jme3.ui.Picture previewPicture = new com.jme3.ui.Picture("CarPreviewPicture");
+        previewPicture.setTexture(assetManager, previewTexture, true);
+        previewPicture.setWidth(300);
+        previewPicture.setHeight(300);
+        previewPicture.setPosition(cam.getWidth() - 350, cam.getHeight() - 350);
+
+        // Add border/background
+        QuadBackgroundComponent border = new QuadBackgroundComponent(new ColorRGBA(0.3f, 0.3f, 0.4f, 0.9f));
+
+        sapp.getGuiNode().attachChild(previewPicture);
+    }
+
+    private void loadCarPreview(String carName) {
+        // Clear existing car model
+        if (currentCarModel != null) {
+            carPreviewNode.detachChild(currentCarModel);
+            currentCarModel = null;
+        }
+
+        // Load the car model based on selection using the actual model paths
+        String modelFolder = getCarModelFolder(carName);
+        if (modelFolder != null) {
+            try {
+                currentCarModel = assetManager.loadModel(modelFolder + "/scene.gltf");
+                currentCarModel.setLocalScale(1f);
+                currentCarModel.setLocalTranslation(0, 0, 0);
+                carRotation = 0f;
+                carPreviewNode.attachChild(currentCarModel);
+            } catch (Exception e) {
+                System.err.println("Failed to load car preview for " + carName + ": " + e.getMessage());
+                // Create a simple placeholder if model fails to load
+            }
+        }
+    }
+
+    private String getCarModelFolder(String carName) {
+        switch (carName) {
+            case "Nismo":
+                return "gtr_nismo";
+            case "GrandTourer":
+                return "grand_tourer";
+            case "PickupTruck":
+                return "pickup_truck";
+            case "Rotator":
+                return "rotator";
+            default:
+                return "gtr_nismo";
+        }
+    }
+
+    private void cleanupCarPreview() {
+        if (previewViewport != null) {
+            sapp.getRenderManager().removeMainView(previewViewport);
+            previewViewport = null;
+        }
+
+        if (carPreviewNode != null) {
+            carPreviewNode.detachAllChildren();
+            carPreviewNode = null;
+        }
+
+        currentCarModel = null;
+
+        // Remove preview picture from GUI
+        Spatial previewPicture = sapp.getGuiNode().getChild("CarPreviewPicture");
+        if (previewPicture != null) {
+            previewPicture.removeFromParent();
+        }
     }
 
     private void updateCameraPosition() {
@@ -222,6 +358,9 @@ public class MainMenuState extends BaseAppState {
 
     @Override
     protected void cleanup(Application app) {
+        // Clean up car preview
+        cleanupCarPreview();
+
         // Clean up menus
         if (menu != null) {
             menu.removeFromParent();

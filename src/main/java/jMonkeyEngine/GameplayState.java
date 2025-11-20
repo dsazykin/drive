@@ -37,6 +37,12 @@ import java.util.concurrent.Executors;
 
 public class GameplayState extends BaseAppState implements ActionListener {
 
+    // Loading callback interface
+    public interface LoadingCallback {
+        void onLoadingStageChanged(String stage);
+        void onLoadingComplete();
+    }
+
     SimpleApplication sapp;
 
     Node rootNode;
@@ -57,6 +63,8 @@ public class GameplayState extends BaseAppState implements ActionListener {
     private Car car;
     private String selectedCar = "Nismo"; // Default car
     private Vector3f resetPoint;
+
+    private LoadingCallback loadingCallback;
 
     private Node gameplayRoot;
     private Node hud;
@@ -80,6 +88,8 @@ public class GameplayState extends BaseAppState implements ActionListener {
 
     @Override
     protected void initialize(Application app) {
+        updateLoadingStage("Initializing game...");
+
         sapp = (SimpleApplication) app;
 
         rootNode = sapp.getRootNode();
@@ -108,10 +118,12 @@ public class GameplayState extends BaseAppState implements ActionListener {
         flyCam.setEnabled(true);
         flyCam.setMoveSpeed(0);
 
+        updateLoadingStage("Setting up physics...");
         bulletAppState = new BulletAppState();
         sapp.getStateManager().attach(bulletAppState);
         bulletAppState.setEnabled(false);
 
+        updateLoadingStage("Initializing terrain generator...");
         road = new RoadGenerator();
         generator = new TerrainGenerator(bulletAppState, gameplayRoot, assetManager, road, sapp, executor,
                                          200, CHUNK_SIZE, SCALE, SEED, 200);
@@ -120,9 +132,11 @@ public class GameplayState extends BaseAppState implements ActionListener {
                                  200, CHUNK_SIZE, SCALE, 2);
         generator.setChunkManager(manager);
 
+        updateLoadingStage("Generating terrain...");
         loadScene();
         System.out.println("loaded terrain");
 
+        updateLoadingStage("Calculating spawn point...");
         int zSpawn = (int) ((CHUNK_SIZE / 2) * (SCALE / 16));
         float spawnHeight = manager.getHeight(200, 0, 500, new ChunkCoord(0, 0));
         resetPoint = new Vector3f(5f, spawnHeight + 1f, zSpawn);
@@ -131,25 +145,47 @@ public class GameplayState extends BaseAppState implements ActionListener {
         cam.setLocation(new Vector3f(5f, spawnHeight + 20, zSpawn));
         cam.lookAt(manager.getCamDirection(spawnHeight), Vector3f.UNIT_Y);
 
+        updateLoadingStage("Setting up controls...");
         setUpKeys();
         System.out.println("set up keys");
+
+        updateLoadingStage("Setting up lighting...");
         setUpLight();
         System.out.println("set up light");
 
+        updateLoadingStage("Loading UI...");
         loadGUI();
         System.out.println("loaded gui");
+
         initPauseMenu();
         System.out.println("loaded pause menu");
-        
+
+        updateLoadingStage("Loading " + selectedCar + "...");
         initCar();
         System.out.println("loaded car");
 
         loadingDone = true;
         enablePlayerControls(true);
+
+        updateLoadingStage("Ready!");
+        if (loadingCallback != null) {
+            loadingCallback.onLoadingComplete();
+        }
     }
 
     public void setSelectedCar(String selectedCar) {
         this.selectedCar = selectedCar;
+    }
+
+    public void setLoadingCallback(LoadingCallback callback) {
+        this.loadingCallback = callback;
+    }
+
+    private void updateLoadingStage(String stage) {
+        System.out.println("Loading: " + stage);
+        if (loadingCallback != null) {
+            loadingCallback.onLoadingStageChanged(stage);
+        }
     }
 
     @Override

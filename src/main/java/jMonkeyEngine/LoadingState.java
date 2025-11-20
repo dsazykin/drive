@@ -19,12 +19,12 @@ public class LoadingState extends BaseAppState {
     private Camera cam;
     private BitmapFont guiFont;
 
-    private String selectedCar;
-    private float loadingProgress = 0f;
-    private float loadingTimer = 0f;
-    private static final float LOADING_DURATION = 3f; // 3 seconds loading simulation
+    private final String selectedCar;
 
     private boolean loadingStarted = false;
+    private boolean gameplayInitialized = false;
+
+    private String currentLoadingStage = "Initializing...";
 
     public LoadingState(String selectedCar) {
         this.selectedCar = selectedCar;
@@ -38,23 +38,24 @@ public class LoadingState extends BaseAppState {
 
         loadingNode = new Node("LoadingScreen");
 
-        // Create loading UI with standard BitmapText for simplicity
+        // Create loading title
         loadingText = new BitmapText(guiFont);
         loadingText.setSize(guiFont.getCharSet().getRenderedSize() * 2);
-        loadingText.setText("Loading...");
+        loadingText.setText("Loading");
         loadingText.setColor(ColorRGBA.White);
 
         // Center the loading text
         float textWidth = loadingText.getLineWidth();
         loadingText.setLocalTranslation(
             (cam.getWidth() - textWidth) / 2f,
-            cam.getHeight() / 2f + 50,
+            cam.getHeight() / 2f + 80,
             0
         );
 
+        // Create stage text
         progressText = new BitmapText(guiFont);
         progressText.setSize(guiFont.getCharSet().getRenderedSize());
-        progressText.setText("0%");
+        progressText.setText("Initializing...");
         progressText.setColor(ColorRGBA.White);
 
         loadingNode.attachChild(loadingText);
@@ -69,6 +70,43 @@ public class LoadingState extends BaseAppState {
     @Override
     protected void onEnable() {
         loadingStarted = true;
+
+        // Start loading the gameplay state in the background
+        new Thread(() -> {
+            try {
+                updateLoadingStage("Creating world...");
+                Thread.sleep(100); // Small delay to show the message
+
+                // Create and initialize gameplay state
+                final GameplayState gameplayState = new GameplayState();
+                gameplayState.setSelectedCar(selectedCar);
+                gameplayState.setLoadingCallback(new GameplayState.LoadingCallback() {
+                    @Override
+                    public void onLoadingStageChanged(String stage) {
+                        updateLoadingStage(stage);
+                    }
+
+                    @Override
+                    public void onLoadingComplete() {
+                        gameplayInitialized = true;
+                    }
+                });
+
+                // Attach the state on the main thread
+                sapp.enqueue(() -> {
+                    getStateManager().attach(gameplayState);
+                    return null;
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                updateLoadingStage("Error loading game: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    public void updateLoadingStage(String stage) {
+        currentLoadingStage = stage;
     }
 
     @Override
@@ -88,14 +126,10 @@ public class LoadingState extends BaseAppState {
         super.update(tpf);
 
         if (loadingStarted) {
-            loadingTimer += tpf;
-            loadingProgress = Math.min(loadingTimer / LOADING_DURATION, 1f);
+            // Update stage text
+            progressText.setText(currentLoadingStage);
 
-            // Update progress text
-            int percentage = (int) (loadingProgress * 100);
-            progressText.setText(percentage + "%");
-
-            // Center progress text
+            // Center the stage text
             float textWidth = progressText.getLineWidth();
             progressText.setLocalTranslation(
                 (cam.getWidth() - textWidth) / 2f,
@@ -103,15 +137,10 @@ public class LoadingState extends BaseAppState {
                 0
             );
 
-            // When loading is complete, start the game
-            if (loadingProgress >= 1f) {
+            // When loading is complete, remove this state
+            if (gameplayInitialized) {
                 loadingStarted = false;
                 getStateManager().detach(this);
-
-                // Create and attach gameplay state
-                GameplayState gameplayState = new GameplayState();
-                gameplayState.setSelectedCar(selectedCar);
-                getStateManager().attach(gameplayState);
             }
         }
     }
