@@ -2,14 +2,15 @@ package jMonkeyEngine.Entities.Cars.CarComponents.Wheel;
 
 import com.jme3.bullet.objects.PhysicsVehicle;
 import com.jme3.bullet.objects.VehicleWheel;
+import jMonkeyEngine.Entities.Cars.Car;
 import jMonkeyEngine.Entities.Cars.CarComponents.Tire.PacejkaTireModel;
 import jMonkeyEngine.Entities.Cars.CarComponents.Steering;
 import jMonkeyEngine.Entities.Cars.CarComponents.Suspension;
-import jMonkeyEngine.Entities.Cars.VehicleModels.Vehicle;
+import java.util.logging.Logger;
 import java.util.logging.Logger;
 
 /**
- * A single wheel of a Vehicle, including its suspension and brakes.
+ * A single wheel of a Car, including its suspension and brakes.
  *
  * Derived from the Wheel class in the Advanced Vehicles project.
  */
@@ -53,9 +54,9 @@ public class Wheel {
      */
     final private Suspension suspension;
     /**
-     * Vehicle that contains this Wheel
+     * Car that contains this Wheel
      */
-    final private Vehicle vehicle;
+    final private Car car;
     /**
      * wheel's physics object
      */
@@ -67,23 +68,23 @@ public class Wheel {
      * Instantiate a wheel (added to the engine body) with the specified
      * parameters.
      *
-     * @param vehicle the Vehicle to which this Wheel will be added (not null,
+     * @param car the Car to which this Wheel will be added (not null,
      * alias created)
      * @param wheelIndex the index among the engine body's wheels (&ge;0)
      * @param steering relationship to the steering system (not null)
      * @param suspension the suspension spring (not null, alias created)
      * @param extraDamping the additional linear damping (&ge;0, &lt;1)
      */
-    public Wheel(Vehicle vehicle, int wheelIndex, Steering steering,
+    public Wheel(Car car, int wheelIndex, Steering steering,
                  Suspension suspension, float extraDamping) {
-        this(vehicle, vehicle.getVehicleControl(), wheelIndex,
+        this(car, car.getVehicleControl(), wheelIndex,
              steering, suspension, extraDamping);
     }
 
     /**
      * Instantiate a wheel with the specified parameters.
      *
-     * @param vehicle the Vehicle to which this Wheel will be added (not null,
+     * @param car the Car to which this Wheel will be added (not null,
      * alias created)
      * @param body the physics body to which this Wheel will be added (not null,
      * alias created)
@@ -92,11 +93,11 @@ public class Wheel {
      * @param suspension the suspension spring (not null, alias created)
      * @param extraDamping the additional linear damping (&ge;0, &lt;1)
      */
-    public Wheel(Vehicle vehicle, PhysicsVehicle body, int wheelIndex,
+    public Wheel(Car car, PhysicsVehicle body, int wheelIndex,
                  Steering steering, Suspension suspension,
                  float extraDamping) {
 
-        this.vehicle = vehicle;
+        this.car = car;
         this.body = body;
         this.wheelIndex = wheelIndex;
         vehicleWheel = body.getWheel(wheelIndex);
@@ -161,13 +162,13 @@ public class Wheel {
     }
 
     /**
-     * Access the Vehicle that contains this Wheel.
+     * Access the Car that contains this Wheel.
      *
      * @return the pre-existing instance (not null)
      */
-    public Vehicle getVehicle() {
-        assert vehicle != null;
-        return vehicle;
+    public Car getCar() {
+        assert car != null;
+        return car;
     }
 
     /**

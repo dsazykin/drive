@@ -3,20 +3,23 @@ package jMonkeyEngine.Entities.Cars.VehicleModels;
 import com.jme3.asset.AssetManager;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.PhysicsSpace;
+import com.jme3.bullet.control.VehicleControl;
 import com.jme3.math.Vector3f;
 import jMonkeyEngine.Entities.Cars.Car;
 import jMonkeyEngine.Entities.Cars.CarComponents.Steering;
 import jMonkeyEngine.Entities.Cars.CarComponents.Suspension;
 import jMonkeyEngine.Entities.Cars.CarComponents.Tire.Tire01;
-import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.DarkAlloyWheel;
+import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.CruiserWheel;
 import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.Wheel;
 import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.WheelModel;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * An example Vehicle, built around iSteven's "Nissan GT-R" model.
+ * An example Vehicle, built around Thomas Glenn Thorne's "Opel GT Retopo"
+ * model.
  */
-public class Nismo extends Car {
+public class GrandTourer extends Car {
     // *************************************************************************
     // constants and loggers
 
@@ -24,23 +27,23 @@ public class Nismo extends Car {
      * message logger for this class
      */
     final public static Logger logger2
-            = Logger.getLogger(Nismo.class.getName());
+            = Logger.getLogger(GrandTourer.class.getName());
     // *************************************************************************
     // constructors
 
-    public Nismo() {
-        super("Nismo", new PhysicsConfig(
-                320f / 3.6f,        // maxSpeed
-                0.1387753516f,      // accelerationConstant
-                16.667f,            // maxReverse
-                0.287534238854f,    // reverseConstant
-                2.78f,              // wheelBase
-                1.6f,               // trackWidth
-                0.5f,               // cgHeight
-                1735,               // mass
-                0.26f,               // dragCoefficient
-                2.15f,               // frontalArea
-                0.015f              // rollingResistanceCoefficient
+    public GrandTourer() {
+        super("Grand Tourer", new PhysicsConfig(
+                220f / 3.6f,        // maxSpeed
+                0.0932516621f,      // accelerationConstant
+                13.8f,              // maxReverse
+                0.19321187354f,     // reverseConstant
+                2.415f,             // wheelBase
+                1.267f,             // trackWidth
+                0.49f,              // cgHeight
+                970,                // mass
+                0.39f,              // dragCoefficient
+                1.65f,              // frontalArea
+                0.012f              // rollingResistanceCoefficient
         ));
     }
     // *************************************************************************
@@ -58,15 +61,14 @@ public class Nismo extends Car {
          * Bullet refers to this as the "chassis".
          */
         float mass = 1_525f; // in kilos
-        float linearDamping = 0.002f;
-        setChassis(
-                "gtr_nismo", "scene.gltf", assetManager, mass, linearDamping);
+        float linearDamping = 0.006f;
+        setChassis("GT", "scene.gltf", assetManager, mass, linearDamping);
 
-        float diameter = 0.74f;
-        WheelModel lFrontWheel = new DarkAlloyWheel(diameter);
-        WheelModel rFrontWheel = new DarkAlloyWheel(diameter);
-        WheelModel lRearWheel = new DarkAlloyWheel(diameter);
-        WheelModel rRearWheel = new DarkAlloyWheel(diameter);
+        float diameter = 0.85f;
+        WheelModel lFrontWheel = new CruiserWheel(diameter);
+        WheelModel rFrontWheel = new CruiserWheel(diameter);
+        WheelModel lRearWheel = new CruiserWheel(diameter);
+        WheelModel rRearWheel = new CruiserWheel(diameter);
         lFrontWheel.load(assetManager);
         rFrontWheel.load(assetManager);
         lRearWheel.load(assetManager);
@@ -81,18 +83,21 @@ public class Nismo extends Car {
          * Add the wheels to the vehicle.
          * For rear-wheel steering, it will be necessary to "flip" the steering.
          */
-        float wheelX = 0.8f; // half of the axle track
-        float axleY = 0.32f; // height of the axles relative to vehicle's CoG
-        float frontZ = 1.42f;
-        float rearZ = -1.36f;
-        float damping = 0.009f; // extra linear damping
-        addWheel(lFrontWheel, new Vector3f(+wheelX, axleY, frontZ),
+        float wheelX = 0.85f; // half of the axle track
+        float frontY = 0.32f; // height of front axle relative to vehicle's CoG
+        float rearY = 0.40f; // height of rear axle relative to vehicle's CoG
+        float frontZ = 1.6f;
+        float rearZ = -1.6f;
+        float mainBrake = 6_000f; // in front only
+        float parkingBrake = 25_000f; // in rear only
+        float damping = 0.02f; // extra linear damping
+        addWheel(lFrontWheel, new Vector3f(+wheelX, frontY, frontZ),
                  Steering.DIRECT, damping);
-        addWheel(rFrontWheel, new Vector3f(-wheelX, axleY, frontZ),
+        addWheel(rFrontWheel, new Vector3f(-wheelX, frontY, frontZ),
                  Steering.DIRECT, damping);
-        addWheel(lRearWheel, new Vector3f(+wheelX, axleY, rearZ),
+        addWheel(lRearWheel, new Vector3f(+wheelX, rearY, rearZ),
                  Steering.UNUSED, damping);
-        addWheel(rRearWheel, new Vector3f(-wheelX, axleY, rearZ),
+        addWheel(rRearWheel, new Vector3f(-wheelX, rearY, rearZ),
                  Steering.UNUSED, damping);
         /*
          * Configure the suspension.
@@ -105,23 +110,22 @@ public class Nismo extends Car {
 
             // how much weight the suspension can take before it bottoms out
             // Setting this too low will make the wheels sink into the ground.
-            suspension.setMaxForce(7_000f);
+            suspension.setMaxForce(8_000f);
 
             // the stiffness of the suspension
             // Setting this too low can cause odd behavior.
-            suspension.setStiffness(12.5f);
+            suspension.setStiffness(10f);
 
             // how fast the suspension will compress
             // 1 = slow, 0 = fast.
-            suspension.setCompressDamping(0.3f);
+            suspension.setCompressDamping(0.33f);
 
             // how quickly the suspension will rebound back to height
             // 1 = slow, 0 = fast.
-            suspension.setRelaxDamping(0.4f);
+            suspension.setRelaxDamping(0.45f);
         }
-        /*
-         * Give each wheel a tire with friction.
-         */
+
+        // Give each wheel a tire with friction.
         for (Wheel wheel : listWheels()) {
             wheel.setTireModel(new Tire01());
             wheel.setFriction(1.6f);

@@ -8,15 +8,16 @@ import jMonkeyEngine.Entities.Cars.Car;
 import jMonkeyEngine.Entities.Cars.CarComponents.Steering;
 import jMonkeyEngine.Entities.Cars.CarComponents.Suspension;
 import jMonkeyEngine.Entities.Cars.CarComponents.Tire.Tire01;
-import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.DarkAlloyWheel;
+import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.RangerWheel;
 import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.Wheel;
 import jMonkeyEngine.Entities.Cars.CarComponents.Wheel.WheelModel;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * An example Vehicle, built around iSteven's "Nissan GT-R" model.
+ * An example Vehicle, built around mauro.zampaoli's "Ford Ranger" model.
  */
-public class Nismo extends Car {
+public class PickupTruck extends Car {
     // *************************************************************************
     // constants and loggers
 
@@ -24,23 +25,23 @@ public class Nismo extends Car {
      * message logger for this class
      */
     final public static Logger logger2
-            = Logger.getLogger(Nismo.class.getName());
+            = Logger.getLogger(PickupTruck.class.getName());
     // *************************************************************************
     // constructors
 
-    public Nismo() {
-        super("Nismo", new PhysicsConfig(
-                320f / 3.6f,        // maxSpeed
-                0.1387753516f,      // accelerationConstant
-                16.667f,            // maxReverse
-                0.287534238854f,    // reverseConstant
-                2.78f,              // wheelBase
-                1.6f,               // trackWidth
-                0.5f,               // cgHeight
-                1735,               // mass
-                0.26f,               // dragCoefficient
-                2.15f,               // frontalArea
-                0.015f              // rollingResistanceCoefficient
+    public PickupTruck() {
+        super("Pickup Truck", new PhysicsConfig(
+                171f / 3.6f,        // maxSpeed
+                0.1311915939f,      // accelerationConstant
+                7.0f,               // maxReverse
+                0.5f,               // reverseConstant
+                3.27f,              // wheelBase
+                1.62f,              // trackWidth
+                0.8f,               // cgHeight
+                2002,               // mass
+                0.40f,              // dragCoefficient
+                2.97f,              // frontalArea
+                0.018f              // rollingResistanceCoefficient
         ));
     }
     // *************************************************************************
@@ -57,16 +58,15 @@ public class Nismo extends Car {
          * Load the C-G model with everything except the wheels.
          * Bullet refers to this as the "chassis".
          */
-        float mass = 1_525f; // in kilos
-        float linearDamping = 0.002f;
-        setChassis(
-                "gtr_nismo", "scene.gltf", assetManager, mass, linearDamping);
+        float mass = 1_550f; // in kilos
+        float linearDamping = 0.01f;
+        setChassis("ford_ranger", "pickup", assetManager, mass, linearDamping);
 
-        float diameter = 0.74f;
-        WheelModel lFrontWheel = new DarkAlloyWheel(diameter);
-        WheelModel rFrontWheel = new DarkAlloyWheel(diameter);
-        WheelModel lRearWheel = new DarkAlloyWheel(diameter);
-        WheelModel rRearWheel = new DarkAlloyWheel(diameter);
+        float diameter = 0.8f;
+        WheelModel lFrontWheel = new RangerWheel(diameter);
+        WheelModel rFrontWheel = new RangerWheel(diameter);
+        WheelModel lRearWheel = new RangerWheel(diameter);
+        WheelModel rRearWheel = new RangerWheel(diameter);
         lFrontWheel.load(assetManager);
         rFrontWheel.load(assetManager);
         lRearWheel.load(assetManager);
@@ -81,11 +81,13 @@ public class Nismo extends Car {
          * Add the wheels to the vehicle.
          * For rear-wheel steering, it will be necessary to "flip" the steering.
          */
-        float wheelX = 0.8f; // half of the axle track
-        float axleY = 0.32f; // height of the axles relative to vehicle's CoG
-        float frontZ = 1.42f;
-        float rearZ = -1.36f;
-        float damping = 0.009f; // extra linear damping
+        float wheelX = 0.75f; // half of the axle track
+        float axleY = 0.45f; // height of the axles relative to vehicle's CoG
+        float frontZ = 1.76f;
+        float rearZ = -1.42f;
+        float mainBrake = 4_000f; // all 4 wheels
+        float parkingBrake = 25_000f; // in rear only
+        float damping = 0.04f; // extra linear damping
         addWheel(lFrontWheel, new Vector3f(+wheelX, axleY, frontZ),
                  Steering.DIRECT, damping);
         addWheel(rFrontWheel, new Vector3f(-wheelX, axleY, frontZ),
@@ -103,28 +105,21 @@ public class Nismo extends Car {
         for (Wheel wheel : listWheels()) {
             Suspension suspension = wheel.getSuspension();
 
+            suspension.setMaxTravelCm(1_000f);
+
             // how much weight the suspension can take before it bottoms out
             // Setting this too low will make the wheels sink into the ground.
-            suspension.setMaxForce(7_000f);
+            suspension.setMaxForce(20_000f);
 
             // the stiffness of the suspension
             // Setting this too low can cause odd behavior.
-            suspension.setStiffness(12.5f);
-
-            // how fast the suspension will compress
-            // 1 = slow, 0 = fast.
-            suspension.setCompressDamping(0.3f);
-
-            // how quickly the suspension will rebound back to height
-            // 1 = slow, 0 = fast.
-            suspension.setRelaxDamping(0.4f);
+            suspension.setStiffness(20f);
         }
-        /*
-         * Give each wheel a tire with friction.
-         */
+
+        // Give each wheel a tire with friction.
         for (Wheel wheel : listWheels()) {
             wheel.setTireModel(new Tire01());
-            wheel.setFriction(1.6f);
+            wheel.setFriction(1f);
         }
 
         build(); // must be invoked last, to complete the Vehicle
