@@ -55,6 +55,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
     RoadGenerator road;
 
     private Car car;
+    private String selectedCar = "Nismo"; // Default car
     private Vector3f resetPoint;
 
     private Node gameplayRoot;
@@ -145,6 +146,10 @@ public class GameplayState extends BaseAppState implements ActionListener {
 
         loadingDone = true;
         enablePlayerControls(true);
+    }
+
+    public void setSelectedCar(String selectedCar) {
+        this.selectedCar = selectedCar;
     }
 
     @Override
@@ -405,7 +410,25 @@ public class GameplayState extends BaseAppState implements ActionListener {
     }
 
     private void initCar() {
-        car = new Nismo();
+        // Dynamically instantiate the selected car
+        switch (selectedCar) {
+            case "Nismo":
+                car = new Nismo();
+                break;
+            case "GrandTourer":
+                car = new GrandTourer();
+                break;
+            case "PickupTruck":
+                car = new PickupTruck();
+                break;
+            case "Rotator":
+                car = new Rotator();
+                break;
+            default:
+                car = new Nismo(); // Fallback to default
+                break;
+        }
+
         car.load(sapp.getAssetManager(), bulletAppState);
 
         // Set desired spawn location

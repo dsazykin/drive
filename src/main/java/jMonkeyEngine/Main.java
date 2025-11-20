@@ -35,7 +35,7 @@ public class Main extends SimpleApplication {
 
         MainMenuState ms = stateManager.getState(MainMenuState.class);
         if (ms != null) {
-            ms.centerMenu(this);
+            ms.centerMenu();
             return;
         }
 
