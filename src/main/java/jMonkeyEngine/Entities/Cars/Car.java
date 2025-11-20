@@ -2,6 +2,7 @@ package jMonkeyEngine.Entities.Cars;
 
 import com.jme3.asset.AssetManager;
 import com.jme3.asset.AssetNotFoundException;
+import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.PhysicsSpace;
 import com.jme3.bullet.PhysicsTickListener;
 import com.jme3.bullet.collision.shapes.CollisionShape;
@@ -293,7 +294,7 @@ public abstract class Car implements PhysicsTickListener {
      *
      * @param assetManager for loading assets (not null)
      */
-    public void load(AssetManager assetManager) {
+    public void load(AssetManager assetManager, BulletAppState bulletAppState) {
         // subclasses should override
     }
 
@@ -426,6 +427,11 @@ public abstract class Car implements PhysicsTickListener {
 
     private void updateRelativeTransforms() {
         // Implementation can be added if needed for multi-body vehicles
+    }
+
+    public void init(BulletAppState bulletAppState) {
+        bulletAppState.getPhysicsSpace().add(this.getVehicleControl());
+        bulletAppState.getPhysicsSpace().addTickListener(this);
     }
 
     // *************************************************************************

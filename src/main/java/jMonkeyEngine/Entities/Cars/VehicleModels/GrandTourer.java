@@ -1,6 +1,7 @@
 package jMonkeyEngine.Entities.Cars.VehicleModels;
 
 import com.jme3.asset.AssetManager;
+import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.PhysicsSpace;
 import com.jme3.bullet.control.VehicleControl;
 import com.jme3.math.Vector3f;
@@ -54,7 +55,7 @@ public class GrandTourer extends Car {
      * @param assetManager for loading assets (not null)
      */
     @Override
-    public void load(AssetManager assetManager) {
+    public void load(AssetManager assetManager, BulletAppState bulletAppState) {
         /*
          * Load the C-G model with everything except the wheels.
          * Bullet refers to this as the "chassis".
@@ -131,6 +132,8 @@ public class GrandTourer extends Car {
         }
 
         build(); // must be invoked last, to complete the Vehicle
+
+        super.init(bulletAppState);
     }
 
     @Override
