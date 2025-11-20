@@ -14,11 +14,9 @@ import com.jme3.math.Vector3f;
 import com.jme3.renderer.Camera;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
-import com.jme3.texture.Texture2D;
 import com.simsilica.lemur.Button;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.Container;
-import com.simsilica.lemur.component.QuadBackgroundComponent;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
@@ -37,8 +35,6 @@ public class MainMenuState extends BaseAppState {
 
     // Car preview
     private Node carPreviewNode;
-    private Camera previewCam;
-    private com.jme3.renderer.ViewPort previewViewport;
     private float carRotation = 0f;
     private Spatial currentCarModel;
 
@@ -159,8 +155,12 @@ public class MainMenuState extends BaseAppState {
         sapp.getGuiNode().attachChild(carSelectionMenu);
         showingCarSelection = true;
 
-        // Initialize car preview
-        initCarPreview();
+        // Initialize car preview (if not already done)
+        if (carPreviewNode == null) {
+            initCarPreview();
+        }
+
+        // Load the car preview
         loadCarPreview(selectedCar);
 
         centerMenu();
@@ -219,34 +219,24 @@ public class MainMenuState extends BaseAppState {
         cameraAngle += tpf * 0.1f; // Slow rotation
         updateCameraPosition();
 
-        // Rotate car preview if in selection menu
+        // Rotate car preview if in selection menu (already on main thread)
         if (showingCarSelection && currentCarModel != null) {
             carRotation += tpf * 0.5f; // Rotate car slowly
-            currentCarModel.setLocalRotation(new Quaternion().fromAngles(0, carRotation, 0));
+            Quaternion rotation = new Quaternion();
+            rotation.fromAngles(0, carRotation, 0);
+            currentCarModel.setLocalRotation(rotation);
         }
     }
 
     private void initCarPreview() {
-        if (previewViewport != null) {
+        if (carPreviewNode != null) {
             return; // Already initialized
         }
 
-        // Create a separate scene for car preview
+        // Create a node for the car preview
         carPreviewNode = new Node("CarPreview");
 
-        // Create preview camera
-        previewCam = new Camera(256, 256);
-        previewCam.setFrustumPerspective(45f, 1f, 0.1f, 100f);
-        previewCam.setLocation(new Vector3f(8, 3, 8));
-        previewCam.lookAt(new Vector3f(0, 1, 0), Vector3f.UNIT_Y);
-
-        // Create viewport for preview
-        previewViewport = sapp.getRenderManager().createMainView("CarPreview", previewCam);
-        previewViewport.setClearFlags(true, true, true);
-        previewViewport.setBackgroundColor(new ColorRGBA(0.2f, 0.2f, 0.3f, 1f));
-        previewViewport.attachScene(carPreviewNode);
-
-        // Add lights to preview scene
+        // Add lights to preview
         AmbientLight al = new AmbientLight();
         al.setColor(ColorRGBA.White.mult(0.8f));
         carPreviewNode.addLight(al);
@@ -256,21 +246,14 @@ public class MainMenuState extends BaseAppState {
         dl.setDirection(new Vector3f(-1, -1, -1).normalizeLocal());
         carPreviewNode.addLight(dl);
 
-        // Create a picture element to display the preview
-        Texture2D previewTexture = new Texture2D(256, 256, com.jme3.texture.Image.Format.RGBA8);
-        previewViewport.setOutputFrameBuffer(null);
+        // Attach the preview node to the background scene
+        backgroundNode.attachChild(carPreviewNode);
 
-        // Position preview on screen (top right area)
-        com.jme3.ui.Picture previewPicture = new com.jme3.ui.Picture("CarPreviewPicture");
-        previewPicture.setTexture(assetManager, previewTexture, true);
-        previewPicture.setWidth(300);
-        previewPicture.setHeight(300);
-        previewPicture.setPosition(cam.getWidth() - 350, cam.getHeight() - 350);
+        // Position it closer to the camera target so it's visible
+        // Place it slightly offset from the center where camera is looking
+        carPreviewNode.setLocalTranslation(cameraTarget.x + 30, cameraTarget.y, cameraTarget.z);
 
-        // Add border/background
-        QuadBackgroundComponent border = new QuadBackgroundComponent(new ColorRGBA(0.3f, 0.3f, 0.4f, 0.9f));
-
-        sapp.getGuiNode().attachChild(previewPicture);
+        System.out.println("Car preview node initialized at: " + carPreviewNode.getLocalTranslation());
     }
 
     private void loadCarPreview(String carName) {
@@ -278,57 +261,56 @@ public class MainMenuState extends BaseAppState {
         if (currentCarModel != null) {
             carPreviewNode.detachChild(currentCarModel);
             currentCarModel = null;
+            System.out.println("Removed previous car model");
         }
 
         // Load the car model based on selection using the actual model paths
-        String modelFolder = getCarModelFolder(carName);
-        if (modelFolder != null) {
+        String modelPath = getCarModelPath(carName);
+        System.out.println("Loading car preview for: " + carName + " from path: " + modelPath);
+
+        if (modelPath != null) {
             try {
-                currentCarModel = assetManager.loadModel(modelFolder + "/scene.gltf");
-                currentCarModel.setLocalScale(1f);
+                // Load and attach the model (this method is called from main thread)
+                currentCarModel = assetManager.loadModel(modelPath);
+
+                // Scale up the car so it's more visible (cars are small by default)
+                currentCarModel.setLocalScale(3f);
                 currentCarModel.setLocalTranslation(0, 0, 0);
                 carRotation = 0f;
                 carPreviewNode.attachChild(currentCarModel);
+
+                System.out.println("Successfully loaded car model: " + carName);
+                System.out.println("Car model bounds: " + currentCarModel.getWorldBound());
+                System.out.println("Car model position: " + currentCarModel.getWorldTranslation());
             } catch (Exception e) {
                 System.err.println("Failed to load car preview for " + carName + ": " + e.getMessage());
-                // Create a simple placeholder if model fails to load
+                e.printStackTrace();
             }
         }
     }
 
-    private String getCarModelFolder(String carName) {
+    private String getCarModelPath(String carName) {
         switch (carName) {
             case "Nismo":
-                return "gtr_nismo";
+                return "Models/gtr_nismo/scene.gltf.j3o";
             case "GrandTourer":
-                return "grand_tourer";
+                return "Models/GT/scene.gltf.j3o";
             case "PickupTruck":
-                return "pickup_truck";
+                return "Models/SportsCar/scene.gltf.j3o";  // Using SportsCar as alternative
             case "Rotator":
-                return "rotator";
+                return "Models/hcr2_rotator/scene.gltf.j3o";
             default:
-                return "gtr_nismo";
+                return "Models/gtr_nismo/scene.gltf.j3o";
         }
     }
 
     private void cleanupCarPreview() {
-        if (previewViewport != null) {
-            sapp.getRenderManager().removeMainView(previewViewport);
-            previewViewport = null;
-        }
-
         if (carPreviewNode != null) {
             carPreviewNode.detachAllChildren();
+            carPreviewNode.removeFromParent();
             carPreviewNode = null;
         }
-
         currentCarModel = null;
-
-        // Remove preview picture from GUI
-        Spatial previewPicture = sapp.getGuiNode().getChild("CarPreviewPicture");
-        if (previewPicture != null) {
-            previewPicture.removeFromParent();
-        }
     }
 
     private void updateCameraPosition() {
