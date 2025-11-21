@@ -64,6 +64,8 @@ public class MainMenuState extends BaseAppState {
     private final float SCALE = 40f;
     private long SEED = 12345L; // Fixed seed for consistent menu terrain
 
+    jMonkeyEngine.Entities.Cars.Car car;
+
     @Override
     protected void initialize(Application app) {
         sapp = (SimpleApplication) app;
@@ -158,6 +160,9 @@ public class MainMenuState extends BaseAppState {
         // Initialize car preview (if not already done)
         if (carPreviewNode == null) {
             initCarPreview();
+        } else {
+            // Update position in case camera moved
+            updateCarPreviewPosition();
         }
 
         // Load the car preview
@@ -221,13 +226,7 @@ public class MainMenuState extends BaseAppState {
 
         // Update car preview position to follow camera and rotate
         if (showingCarSelection && carPreviewNode != null) {
-            // Position car preview in front of camera
-            Vector3f camPos = cam.getLocation();
-            Vector3f camDir = cam.getDirection();
-
-            // Place car 20 units in front of camera, 5 units up (closer and higher)
-            Vector3f carPos = camPos.add(camDir.mult(40)).add(0, 5, 0);
-            carPreviewNode.setLocalTranslation(carPos);
+            updateCarPreviewPosition();
 
             // Rotate car slowly
             if (currentCarModel != null) {
@@ -237,6 +236,24 @@ public class MainMenuState extends BaseAppState {
                 currentCarModel.setLocalRotation(rotation);
             }
         }
+    }
+
+    private void updateCarPreviewPosition() {
+        // Position car preview in front of camera
+        Vector3f camPos = cam.getLocation();
+        Vector3f camDir = cam.getDirection().normalize();
+
+        // Place car 25 units in front of camera, slightly above
+        Vector3f carPos = camPos.add(camDir.mult(50));
+        carPos.y += 5; // Lift it up 5 units above camera direction
+        if (car != null) {
+            car.getCarNode().setLocalTranslation(carPos);
+            car.getControl().setPhysicsLocation(carPos);
+        }
+
+        System.out.println("Camera position: " + camPos);
+        System.out.println("Camera direction: " + camDir);
+        System.out.println("Car preview position set to: " + carPos);
     }
 
     private void initCarPreview() {
@@ -260,11 +277,8 @@ public class MainMenuState extends BaseAppState {
         // Attach the preview node to the background scene
         backgroundNode.attachChild(carPreviewNode);
 
-        // Initial position will be updated in update() to follow camera
-        Vector3f camPos = cam.getLocation();
-        Vector3f camDir = cam.getDirection();
-        Vector3f initialPos = camPos.add(camDir.mult(20)).add(0, 5, 0);
-        carPreviewNode.setLocalTranslation(initialPos);
+        // Position it in front of camera
+        updateCarPreviewPosition();
 
         System.out.println("Car preview node initialized at: " + carPreviewNode.getLocalTranslation());
     }
@@ -277,49 +291,67 @@ public class MainMenuState extends BaseAppState {
             System.out.println("Removed previous car model");
         }
 
-        // Load the car model based on selection using the actual model paths
-        String modelPath = getCarModelPath(carName);
-        System.out.println("Loading car preview for: " + carName + " from path: " + modelPath);
-
-        if (modelPath == null) {
-            System.out.println("No preview model available for: " + carName);
-            return;
-        }
+        System.out.println("Loading car preview for: " + carName);
 
         try {
-            // Load and attach the model (this method is called from main thread)
-            currentCarModel = assetManager.loadModel(modelPath);
+            // Instantiate the actual car object to get complete model with wheels
+            car = instantiateCarByName(carName);
 
-            // Scale up the car so it's more visible (cars are small by default)
+            if (car == null) {
+                System.err.println("Failed to instantiate car: " + carName);
+                return;
+            }
+
+            System.out.println("Car instantiated: " + car.getClass().getName());
+
+            // Load the car (this creates the full model with wheels)
+            car.load(assetManager);
+
+            System.out.println("Car loaded successfully");
+
+            // Get the car's node which contains the complete assembled car
+            currentCarModel = car.getCarNode();
+
+            System.out.println("Car node retrieved: " + currentCarModel);
+            if (currentCarModel instanceof Node) {
+                System.out.println("Car node has " + ((Node) currentCarModel).getChildren().size() + " children");
+            }
+            System.out.println("Car node local translation: " + currentCarModel.getLocalTranslation());
+            System.out.println("Car node local scale: " + currentCarModel.getLocalScale());
+
+            // Scale up the car VERY significantly so it's visible (increased to 10x)
             currentCarModel.setLocalScale(3f);
             currentCarModel.setLocalTranslation(0, 0, 0);
             carRotation = 0f;
             carPreviewNode.attachChild(currentCarModel);
 
+            // Force update the parent node's geometric state so child inherits position
+            carPreviewNode.updateGeometricState();
+
             System.out.println("Successfully loaded car model: " + carName);
+            System.out.println("Car model scale after setting to 10x: " + currentCarModel.getLocalScale());
             System.out.println("Car model bounds: " + currentCarModel.getWorldBound());
-            System.out.println("Car model position: " + currentCarModel.getWorldTranslation());
+            System.out.println("Car model world position: " + currentCarModel.getWorldTranslation());
+            System.out.println("Car preview node position: " + carPreviewNode.getWorldTranslation());
+            System.out.println("Distance from camera: " + cam.getLocation().distance(currentCarModel.getWorldTranslation()));
         } catch (Exception e) {
             System.err.println("Failed to load car preview for " + carName + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private String getCarModelPath(String carName) {
+    private jMonkeyEngine.Entities.Cars.Car instantiateCarByName(String carName) {
         switch (carName) {
             case "Nismo":
-                return "Models/gtr_nismo/scene.gltf.j3o";
+                return new jMonkeyEngine.Entities.Cars.VehicleModels.Nismo();
             case "GrandTourer":
-                return "Models/GT/scene.gltf.j3o";
+                return new jMonkeyEngine.Entities.Cars.VehicleModels.GrandTourer();
             case "PickupTruck":
-                // ford_ranger doesn't have a scene file, only individual wheel.j3o
-                // Return null to skip preview for this car
-                System.out.println("PickupTruck preview not available - no scene model");
-                return null;
+                return new jMonkeyEngine.Entities.Cars.VehicleModels.PickupTruck();
             case "Rotator":
-                return "Models/hcr2_rotator/chassis.j3o";
+                return new jMonkeyEngine.Entities.Cars.VehicleModels.Rotator();
             default:
-                return "Models/gtr_nismo/scene.gltf.j3o";
+                return new jMonkeyEngine.Entities.Cars.VehicleModels.Nismo();
         }
     }
 
