@@ -219,12 +219,23 @@ public class MainMenuState extends BaseAppState {
         cameraAngle += tpf * 0.1f; // Slow rotation
         updateCameraPosition();
 
-        // Rotate car preview if in selection menu (already on main thread)
-        if (showingCarSelection && currentCarModel != null) {
-            carRotation += tpf * 0.5f; // Rotate car slowly
-            Quaternion rotation = new Quaternion();
-            rotation.fromAngles(0, carRotation, 0);
-            currentCarModel.setLocalRotation(rotation);
+        // Update car preview position to follow camera and rotate
+        if (showingCarSelection && carPreviewNode != null) {
+            // Position car preview in front of camera
+            Vector3f camPos = cam.getLocation();
+            Vector3f camDir = cam.getDirection();
+
+            // Place car 20 units in front of camera, 5 units up (closer and higher)
+            Vector3f carPos = camPos.add(camDir.mult(40)).add(0, 5, 0);
+            carPreviewNode.setLocalTranslation(carPos);
+
+            // Rotate car slowly
+            if (currentCarModel != null) {
+                carRotation += tpf * 0.5f;
+                Quaternion rotation = new Quaternion();
+                rotation.fromAngles(0, carRotation, 0);
+                currentCarModel.setLocalRotation(rotation);
+            }
         }
     }
 
@@ -249,9 +260,11 @@ public class MainMenuState extends BaseAppState {
         // Attach the preview node to the background scene
         backgroundNode.attachChild(carPreviewNode);
 
-        // Position it closer to the camera target so it's visible
-        // Place it slightly offset from the center where camera is looking
-        carPreviewNode.setLocalTranslation(cameraTarget.x + 30, cameraTarget.y, cameraTarget.z);
+        // Initial position will be updated in update() to follow camera
+        Vector3f camPos = cam.getLocation();
+        Vector3f camDir = cam.getDirection();
+        Vector3f initialPos = camPos.add(camDir.mult(20)).add(0, 5, 0);
+        carPreviewNode.setLocalTranslation(initialPos);
 
         System.out.println("Car preview node initialized at: " + carPreviewNode.getLocalTranslation());
     }
@@ -268,24 +281,27 @@ public class MainMenuState extends BaseAppState {
         String modelPath = getCarModelPath(carName);
         System.out.println("Loading car preview for: " + carName + " from path: " + modelPath);
 
-        if (modelPath != null) {
-            try {
-                // Load and attach the model (this method is called from main thread)
-                currentCarModel = assetManager.loadModel(modelPath);
+        if (modelPath == null) {
+            System.out.println("No preview model available for: " + carName);
+            return;
+        }
 
-                // Scale up the car so it's more visible (cars are small by default)
-                currentCarModel.setLocalScale(3f);
-                currentCarModel.setLocalTranslation(0, 0, 0);
-                carRotation = 0f;
-                carPreviewNode.attachChild(currentCarModel);
+        try {
+            // Load and attach the model (this method is called from main thread)
+            currentCarModel = assetManager.loadModel(modelPath);
 
-                System.out.println("Successfully loaded car model: " + carName);
-                System.out.println("Car model bounds: " + currentCarModel.getWorldBound());
-                System.out.println("Car model position: " + currentCarModel.getWorldTranslation());
-            } catch (Exception e) {
-                System.err.println("Failed to load car preview for " + carName + ": " + e.getMessage());
-                e.printStackTrace();
-            }
+            // Scale up the car so it's more visible (cars are small by default)
+            currentCarModel.setLocalScale(3f);
+            currentCarModel.setLocalTranslation(0, 0, 0);
+            carRotation = 0f;
+            carPreviewNode.attachChild(currentCarModel);
+
+            System.out.println("Successfully loaded car model: " + carName);
+            System.out.println("Car model bounds: " + currentCarModel.getWorldBound());
+            System.out.println("Car model position: " + currentCarModel.getWorldTranslation());
+        } catch (Exception e) {
+            System.err.println("Failed to load car preview for " + carName + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -296,9 +312,12 @@ public class MainMenuState extends BaseAppState {
             case "GrandTourer":
                 return "Models/GT/scene.gltf.j3o";
             case "PickupTruck":
-                return "Models/SportsCar/scene.gltf.j3o";  // Using SportsCar as alternative
+                // ford_ranger doesn't have a scene file, only individual wheel.j3o
+                // Return null to skip preview for this car
+                System.out.println("PickupTruck preview not available - no scene model");
+                return null;
             case "Rotator":
-                return "Models/hcr2_rotator/scene.gltf.j3o";
+                return "Models/hcr2_rotator/chassis.j3o";
             default:
                 return "Models/gtr_nismo/scene.gltf.j3o";
         }
