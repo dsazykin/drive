@@ -244,8 +244,8 @@ public class MainMenuState extends BaseAppState {
         Vector3f camDir = cam.getDirection().normalize();
 
         // Place car 25 units in front of camera, slightly above
-        Vector3f carPos = camPos.add(camDir.mult(50));
-        carPos.y += 5; // Lift it up 5 units above camera direction
+        Vector3f carPos = camPos.add(camDir.mult(15f));
+        carPos.y += 2.5f; // Lift it up 5 units above camera direction
         if (car != null) {
             car.getCarNode().setLocalTranslation(carPos);
             car.getControl().setPhysicsLocation(carPos);
@@ -314,7 +314,7 @@ public class MainMenuState extends BaseAppState {
             }
 
             // Scale up the car
-            currentCarModel.setLocalScale(3f);
+            currentCarModel.setLocalScale(1f);
             currentCarModel.setLocalTranslation(0, 0, 0);
             carRotation = 0f;
             carPreviewNode.attachChild(currentCarModel);
