@@ -19,6 +19,7 @@ import com.simsilica.lemur.Label;
 import com.simsilica.lemur.Container;
 import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
+import jMonkeyEngine.Entities.Cars.Car;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 
@@ -86,11 +87,18 @@ public class MainMenuState extends BaseAppState {
     private volatile boolean isLoadingCar = false;
     private String carBeingLoaded = null;
 
+    private ExecutorService terrainLoadExecutor = Executors.newSingleThreadExecutor();
+    private volatile boolean isLoadingTerrain = false;
+    private String terrainBeingLoaded = null;
+
     @Override
     protected void initialize(Application app) {
         sapp = (SimpleApplication) app;
         cam = sapp.getCamera();
         assetManager = sapp.getAssetManager();
+
+        // Set default camera target before terrain loads
+        cameraTarget = new Vector3f((CHUNK_SIZE / 2f) * (SCALE / 16f), 20, (CHUNK_SIZE / 2f) * (SCALE / 16f));
 
         // Set up background terrain
         initBackgroundTerrain();
@@ -114,41 +122,73 @@ public class MainMenuState extends BaseAppState {
 
         bulletAppState = new BulletAppState();
         sapp.getStateManager().attach(bulletAppState);
-        bulletAppState.setEnabled(false); // No physics needed for menu
+        bulletAppState.setEnabled(false);
 
         road = new RoadGenerator();
         generator = new TerrainGenerator(bulletAppState, backgroundNode, assetManager, road, sapp, executor,
-                200, CHUNK_SIZE, SCALE, SEED, 200);
+                                         200, CHUNK_SIZE, SCALE, SEED, 200);
         manager = new ChunkManager(bulletAppState, backgroundNode, road, generator, sapp, executor,
-                200, CHUNK_SIZE, SCALE, 1);
+                                   200, CHUNK_SIZE, SCALE, 1);
         generator.setChunkManager(manager);
 
-        // Try to load saved terrain first
-        boolean loaded = TerrainSerializer.terrainExists(MENU_TERRAIN_NAME)
-                && generator.loadSavedTerrain(MENU_TERRAIN_NAME);
+        // Load on background thread
+        terrainLoadExecutor.submit(() -> {
+            try {
+                // Only do file I/O on background thread
+                boolean terrainExists = TerrainSerializer.terrainExists(MENU_TERRAIN_NAME);
 
-        if (!loaded) {
-            // Generate new terrain if load failed
-            System.out.println("Generating new menu terrain...");
-            generator.CreateTerrain();
+                // Switch to render thread for all JME operations
+                sapp.enqueue(() -> {
+                    try {
+                        isLoadingTerrain = true;
+                        terrainBeingLoaded = MENU_TERRAIN_NAME;
 
-            // Save it for next time
-            generator.saveGeneratedTerrain(MENU_TERRAIN_NAME);
-        } else {
-            System.out.println("Loaded pre-generated menu terrain");
-        }
+                        boolean loaded = false;
+                        if (terrainExists) {
+                            loaded = generator.loadSavedTerrain(MENU_TERRAIN_NAME);
+                            System.out.println("Loaded pre-generated menu terrain");
+                        }
 
-        System.out.println("Saved generated geometries count: " +
-                generator.getGeneratedChildGeometries().size());
+                        if (!loaded) {
+                            System.out.println("Generating new menu terrain...");
+                            generator.CreateTerrain();
 
-        // Set camera target to chunk center
-        float chunkCenterX = 0; // Center of chunk 0,0
-        float chunkCenterZ = (CHUNK_SIZE / 2f) * (SCALE / 16f);
-        float centerHeight = manager.getHeight(200, 0, (int) (chunkCenterZ / (SCALE / 16f)), new jMonkeyEngine.Chunks.ChunkCoord(0, 0));
-        cameraTarget = new Vector3f(chunkCenterX, centerHeight + 20, chunkCenterZ);
+                            // Save in background after generation
+                            terrainLoadExecutor.submit(() -> {
+                                generator.saveGeneratedTerrain(MENU_TERRAIN_NAME);
+                            });
+                        }
 
-        // Set sky color
-        sapp.getViewPort().setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
+                        System.out.println("Saved generated geometries count: " +
+                                                   generator.getGeneratedChildGeometries().size());
+
+                        // Set camera target
+                        float chunkCenterX = (CHUNK_SIZE / 2f) * (SCALE / 16f);
+                        float chunkCenterZ = (CHUNK_SIZE / 2f) * (SCALE / 16f);
+                        float centerHeight = manager.getHeight(200, 0, (int) (chunkCenterZ / (SCALE / 16f)),
+                                                               new ChunkCoord(0, 0));
+                        cameraTarget = new Vector3f(chunkCenterX, centerHeight + 20, chunkCenterZ);
+
+                        // Set sky color
+                        sapp.getViewPort().setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
+
+                    } catch (Exception e) {
+                        System.err.println("Failed to load terrain: " + e.getMessage());
+                        e.printStackTrace();
+                    } finally {
+                        isLoadingTerrain = false;
+                        terrainBeingLoaded = null;
+                    }
+                    return null;
+                });
+
+            } catch (Exception e) {
+                System.err.println("Failed to check terrain: " + e.getMessage());
+                e.printStackTrace();
+                isLoadingTerrain = false;
+                terrainBeingLoaded = null;
+            }
+        });
     }
 
     private void setUpLight() {
@@ -463,7 +503,7 @@ public class MainMenuState extends BaseAppState {
         });
     }
 
-    private jMonkeyEngine.Entities.Cars.Car instantiateCarByName(String carName) {
+    private Car instantiateCarByName(String carName) {
         switch (carName) {
             case "Nismo":
                 return new jMonkeyEngine.Entities.Cars.VehicleModels.Nismo();
@@ -488,6 +528,13 @@ public class MainMenuState extends BaseAppState {
     }
 
     private void updateCameraPosition() {
+        if (cameraTarget == null) {
+            // Fallback position if terrain hasn't loaded yet
+            cam.setLocation(new Vector3f(1200, 70, 1200));
+            cam.lookAt(new Vector3f((CHUNK_SIZE / 2f) * (SCALE / 16f), 20, (CHUNK_SIZE / 2f) * (SCALE / 16f)), Vector3f.UNIT_Y);
+            return;
+        }
+
         float x = cameraTarget.x + FastMath.cos(cameraAngle) * cameraDistance;
         float z = cameraTarget.z + FastMath.sin(cameraAngle) * cameraDistance;
         float y = cameraTarget.y + 50;
@@ -519,6 +566,12 @@ public class MainMenuState extends BaseAppState {
     protected void cleanup(Application app) {
         // Clean up car preview
         cleanupCarPreview();
+
+        // Shutdown terrain loading executor
+        if (terrainLoadExecutor != null && !terrainLoadExecutor.isShutdown()) {
+            terrainLoadExecutor.shutdownNow();
+            terrainLoadExecutor = null;
+        }
 
         // Shutdown car loading executor
         if (carLoadExecutor != null && !carLoadExecutor.isShutdown()) {
