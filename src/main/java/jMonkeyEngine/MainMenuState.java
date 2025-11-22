@@ -66,6 +66,18 @@ public class MainMenuState extends BaseAppState {
 
     jMonkeyEngine.Entities.Cars.Car car;
 
+    // Add animation variables
+    private float menuAnimationProgress = 0f;
+    private float menuTargetX = 0f;
+    private float menuStartX = 0f;
+    private boolean isAnimatingMenu = false;
+    private static final float MENU_ANIMATION_SPEED = 3f;
+
+    // Camera adjustment for car selection
+    private float originalCameraDistance;
+    private float targetCameraDistance;
+    private boolean isAdjustingCamera = false;
+
     @Override
     protected void initialize(Application app) {
         sapp = (SimpleApplication) app;
@@ -83,6 +95,8 @@ public class MainMenuState extends BaseAppState {
 
         // Initialize camera position
         updateCameraPosition();
+
+        originalCameraDistance = cameraDistance;
     }
 
     private void initBackgroundTerrain() {
@@ -168,7 +182,12 @@ public class MainMenuState extends BaseAppState {
         // Load the car preview
         loadCarPreview(selectedCar);
 
-        centerMenu();
+        // Start animation to move menu to the left
+        animateMenuToLeft();
+
+        // Zoom in camera slightly for better car view
+        targetCameraDistance = cameraDistance * 0.7f;
+        isAdjustingCamera = true;
     }
 
     private void createCarSelectionMenu() {
@@ -206,7 +225,13 @@ public class MainMenuState extends BaseAppState {
             sapp.getGuiNode().attachChild(menu);
             showingCarSelection = false;
             cleanupCarPreview();
-            centerMenu();
+
+            // Animate menu back to center
+            animateMenuToCenter();
+
+            // Reset camera distance
+            targetCameraDistance = originalCameraDistance;
+            isAdjustingCamera = true;
         });
     }
 
@@ -222,7 +247,39 @@ public class MainMenuState extends BaseAppState {
 
         // Rotate camera around the terrain
         cameraAngle += tpf * 0.1f; // Slow rotation
+
+        // Animate camera distance
+        if (isAdjustingCamera) {
+            float diff = targetCameraDistance - cameraDistance;
+            if (Math.abs(diff) < 0.1f) {
+                cameraDistance = targetCameraDistance;
+                isAdjustingCamera = false;
+            } else {
+                cameraDistance += diff * tpf * 2f;
+            }
+        }
+
         updateCameraPosition();
+
+        // Animate menu position
+        if (isAnimatingMenu) {
+            menuAnimationProgress += tpf * MENU_ANIMATION_SPEED;
+            if (menuAnimationProgress >= 1f) {
+                menuAnimationProgress = 1f;
+                isAnimatingMenu = false;
+            }
+
+            // Smooth interpolation (ease-in-out)
+            float t = menuAnimationProgress;
+            float smoothT = t * t * (3f - 2f * t);
+
+            Container activeMenu = showingCarSelection ? carSelectionMenu : menu;
+            float currentX = menuStartX + (menuTargetX - menuStartX) * smoothT;
+
+            float height = cam.getHeight();
+            float menuHeight = activeMenu.getPreferredSize().y;
+            activeMenu.setLocalTranslation(currentX, (height + menuHeight) / 2f, 0);
+        }
 
         // Update car preview position to follow camera and rotate
         if (showingCarSelection && carPreviewNode != null) {
@@ -238,14 +295,45 @@ public class MainMenuState extends BaseAppState {
         }
     }
 
+    private void animateMenuToLeft() {
+        float width = cam.getWidth();
+        float menuWidth = carSelectionMenu.getPreferredSize().x;
+
+        // Current centered position
+        menuStartX = (width - menuWidth) / 2f;
+
+        // Target position: left side with padding
+        menuTargetX = 50f;
+
+        menuAnimationProgress = 0f;
+        isAnimatingMenu = true;
+    }
+
+    private void animateMenuToCenter() {
+        float width = cam.getWidth();
+        float menuWidth = menu.getPreferredSize().x;
+
+        // Current position (left side)
+        menuStartX = 50f;
+
+        // Target position: centered
+        menuTargetX = (width - menuWidth) / 2f;
+
+        menuAnimationProgress = 0f;
+        isAnimatingMenu = true;
+    }
+
     private void updateCarPreviewPosition() {
-        // Position car preview in front of camera
+        // Position car preview on the right side of the screen
         Vector3f camPos = cam.getLocation();
         Vector3f camDir = cam.getDirection().normalize();
+        Vector3f camRight = cam.getLeft().mult(-1).normalize();
 
-        // Place car 25 units in front of camera, slightly above
-        Vector3f carPos = camPos.add(camDir.mult(15f));
-        carPos.y += 2.5f; // Lift it up 5 units above camera direction
+        // Place car in front and to the right of camera
+        Vector3f carPos = camPos.add(camDir.mult(10f));
+        carPos = carPos.add(camRight.mult(1.25f)); // Offset to the right
+        carPos.y += -0.25f; // Lower it up slightly
+
         if (car != null) {
             car.getCarNode().setLocalTranslation(carPos);
             car.getControl().setPhysicsLocation(carPos);
@@ -364,19 +452,22 @@ public class MainMenuState extends BaseAppState {
     }
 
     public void centerMenu() {
-        float width = cam.getWidth();
-        float height = cam.getHeight();
+        // Only center if not animating and not showing car selection
+        if (!isAnimatingMenu && !showingCarSelection) {
+            float width = cam.getWidth();
+            float height = cam.getHeight();
 
-        Container activeMenu = showingCarSelection ? carSelectionMenu : menu;
+            Container activeMenu = menu;
 
-        float menuWidth = activeMenu.getPreferredSize().x;
-        float menuHeight = activeMenu.getPreferredSize().y;
+            float menuWidth = activeMenu.getPreferredSize().x;
+            float menuHeight = activeMenu.getPreferredSize().y;
 
-        activeMenu.setLocalTranslation(
-                (width - menuWidth) / 2f,
-                (height + menuHeight) / 2f,
-                0
-        );
+            activeMenu.setLocalTranslation(
+                    (width - menuWidth) / 2f,
+                    (height + menuHeight) / 2f,
+                    0
+            );
+        }
     }
 
     @Override
