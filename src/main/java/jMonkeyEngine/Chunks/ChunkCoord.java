@@ -1,8 +1,11 @@
 package jMonkeyEngine.Chunks;
 
+import java.io.Serializable;
 import java.util.Objects;
 
-public class ChunkCoord {
+public class ChunkCoord implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     public final int x;
     public final int z;
 

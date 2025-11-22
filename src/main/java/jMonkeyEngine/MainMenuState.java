@@ -17,10 +17,12 @@ import com.jme3.scene.Spatial;
 import com.simsilica.lemur.Button;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.Container;
+import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
 
+import jMonkeyEngine.Terrain.TerrainSerializer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -78,6 +80,8 @@ public class MainMenuState extends BaseAppState {
     private float targetCameraDistance;
     private boolean isAdjustingCamera = false;
 
+    private static final String MENU_TERRAIN_NAME = "main_menu_terrain";
+
     @Override
     protected void initialize(Application app) {
         sapp = (SimpleApplication) app;
@@ -115,13 +119,28 @@ public class MainMenuState extends BaseAppState {
                 200, CHUNK_SIZE, SCALE, 1);
         generator.setChunkManager(manager);
 
-        // Generate initial terrain chunks
-        generator.CreateTerrain();
+        // Try to load saved terrain first
+        boolean loaded = TerrainSerializer.terrainExists(MENU_TERRAIN_NAME)
+                && generator.loadSavedTerrain(MENU_TERRAIN_NAME);
+
+        if (!loaded) {
+            // Generate new terrain if load failed
+            System.out.println("Generating new menu terrain...");
+            generator.CreateTerrain();
+
+            // Save it for next time
+            generator.saveGeneratedTerrain(MENU_TERRAIN_NAME);
+        } else {
+            System.out.println("Loaded pre-generated menu terrain");
+        }
+
+        System.out.println("Saved generated geometries count: " +
+                generator.getGeneratedChildGeometries().size());
 
         // Set camera target to chunk center
         float chunkCenterX = 0; // Center of chunk 0,0
         float chunkCenterZ = (CHUNK_SIZE / 2f) * (SCALE / 16f);
-        float centerHeight = manager.getHeight(200, 0, (int)(chunkCenterZ / (SCALE / 16f)), new jMonkeyEngine.Chunks.ChunkCoord(0, 0));
+        float centerHeight = manager.getHeight(200, 0, (int) (chunkCenterZ / (SCALE / 16f)), new jMonkeyEngine.Chunks.ChunkCoord(0, 0));
         cameraTarget = new Vector3f(chunkCenterX, centerHeight + 20, chunkCenterZ);
 
         // Set sky color
@@ -516,4 +535,3 @@ public class MainMenuState extends BaseAppState {
         sapp.getInputManager().setCursorVisible(false);
     }
 }
-

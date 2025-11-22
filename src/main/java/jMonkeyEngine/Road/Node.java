@@ -1,6 +1,10 @@
 package jMonkeyEngine.Road;
 
-public class Node implements Comparable<Node> {
+import java.io.Serializable;
+
+public class Node implements Comparable<Node>, Serializable {
+    private static final long serialVersionUID = 1L;
+
     public int x;
     public int y;
     public float height;

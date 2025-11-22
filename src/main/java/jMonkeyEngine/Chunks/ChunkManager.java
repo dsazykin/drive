@@ -186,4 +186,8 @@ public class ChunkManager {
     public List<jMonkeyEngine.Road.Node> getRoadPoints(ChunkCoord chunk) {
         return generatedRoads.get(chunk);
     }
+
+    public ConcurrentHashMap<ChunkCoord, Geometry> getChunk(ChunkCoord chunk) {
+        return generatedChunks.get(chunk);
+    }
 }
