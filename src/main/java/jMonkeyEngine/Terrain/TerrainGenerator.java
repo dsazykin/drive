@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import jMonkeyEngine.Terrain.TerrainSerializer.TerrainData;
 
 public class TerrainGenerator{
 
@@ -42,6 +43,11 @@ public class TerrainGenerator{
     private final int MAX_HEIGHT;
 
     private List<Future<?>> chunkTasks;
+
+    // Saved data for reuse
+    private ConcurrentHashMap<ChunkCoord, Geometry> generatedChildGeometries = new ConcurrentHashMap<>();
+    private float[][] lastGeneratedTerrain;
+    private List<jMonkeyEngine.Road.Node> lastPathPoints;
 
     public TerrainGenerator(BulletAppState bulletAppState,
                             Node rootNode, AssetManager assetManager, RoadGenerator road, SimpleApplication main,
@@ -219,44 +225,127 @@ public class TerrainGenerator{
         return chunkGeom;
     }
 
+    public ConcurrentHashMap<ChunkCoord, Geometry> getGeneratedChildGeometries() {
+        return generatedChildGeometries;
+    }
+    public float[][] getLastGeneratedTerrain() {
+        return lastGeneratedTerrain;
+    }
+    public List<jMonkeyEngine.Road.Node> getLastPathPoints() {
+        return lastPathPoints;
+    }
+
+    /**
+     * Save current generated terrain to disk
+     */
+    public boolean saveGeneratedTerrain(String name) {
+        if (lastGeneratedTerrain == null) {
+            System.err.println("No terrain to save!");
+            return false;
+        }
+
+        return TerrainSerializer.saveTerrain(
+            name,
+            lastGeneratedTerrain,
+            generatedChildGeometries,
+            lastPathPoints,
+            PARENT_SIZE,
+            CHUNK_SIZE,
+            SCALE,
+            SEED
+        );
+    }
+
+    /**
+     * Load and apply saved terrain.
+     */
+    public boolean loadSavedTerrain(String name) {
+        TerrainData data = TerrainSerializer.loadTerrain(name);
+
+        if (data == null) {
+            return false;
+        }
+
+        // Verify compatibility
+        if (data.parentSize != PARENT_SIZE || data.chunkSize != CHUNK_SIZE) {
+            System.err.println("Saved terrain size mismatch!");
+            return false;
+        }
+
+        // Apply loaded data
+        lastGeneratedTerrain = data.heightMap;
+        lastPathPoints = data.pathPoints;
+
+        // Regenerate geometries from heightmap
+        ConcurrentHashMap<ChunkCoord, Geometry> children = new ConcurrentHashMap<>();
+        ChunkCoord rootChunk = new ChunkCoord(0, 0);
+
+        for (int x = 0; x < PARENT_SIZE / CHUNK_SIZE; x++) {
+            for (int z = 0; z < PARENT_SIZE / CHUNK_SIZE; z++) {
+                ChunkCoord childCoord = new ChunkCoord(x, z);
+                children.put(childCoord, manager.getChild(data.heightMap, rootChunk, childCoord));
+            }
+        }
+
+        generatedChildGeometries.clear();
+        generatedChildGeometries.putAll(children);
+
+        manager.addChunk(rootChunk, children, data.heightMap, data.pathPoints);
+
+        main.enqueue(() -> {
+            for (ChunkCoord child : children.keySet()) {
+                Geometry chunkGeom = children.get(child);
+                rootNode.attachChild(chunkGeom);
+                bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
+            }
+            return null;
+        });
+
+        System.out.println("Loaded terrain successfully");
+        return true;
+    }
+
     public void CreateTerrain() {
         chunkTasks = new ArrayList<>();
 
         final ChunkCoord chunk = new ChunkCoord(0, 0);
+        try {
+            float[][] terrain = generateHeightMap(chunk);
+            List<jMonkeyEngine.Road.Node> pathPoints =
+                    road.getRoadPointsInChunk(terrain, 0, PARENT_SIZE / 2, PARENT_SIZE - 1,
+                                              PARENT_SIZE / 2);
+            updateHeightMap(terrain, pathPoints);
 
-            try {
-                float[][] terrain = generateHeightMap(chunk);
-                List<jMonkeyEngine.Road.Node> pathPoints =
-                        road.getRoadPointsInChunk(terrain, 0, PARENT_SIZE / 2, PARENT_SIZE - 1,
-                                                  PARENT_SIZE / 2);
-                updateHeightMap(terrain, pathPoints);
+            ConcurrentHashMap<ChunkCoord, Geometry> children = new ConcurrentHashMap<>();
+            ChunkCoord childCoord;
 
-                ConcurrentHashMap<ChunkCoord, Geometry> children = new ConcurrentHashMap<>();
-                ChunkCoord childCoord;
+            for (int x = 0; x < PARENT_SIZE / CHUNK_SIZE; x++) {
+                for (int z = 0; z < PARENT_SIZE / CHUNK_SIZE; z++) {
+                    childCoord = new ChunkCoord(x, z);
+                    children.put(childCoord, manager.getChild(terrain, chunk, childCoord));
+                }
+            }
+            // Save for later reuse
+            generatedChildGeometries.clear();
+            generatedChildGeometries.putAll(children);
+            lastGeneratedTerrain = terrain;
+            lastPathPoints = pathPoints;
 
-                for (int x = 0; x < PARENT_SIZE / CHUNK_SIZE; x++) {
-                    for (int z = 0; z < PARENT_SIZE / CHUNK_SIZE; z++) {
-                        childCoord = new ChunkCoord(x, z);
-                        children.put(childCoord, manager.getChild(terrain, chunk, childCoord));
-                    }
+            manager.addChunk(chunk, children, terrain, pathPoints);
+            main.enqueue(() -> {
+                Geometry chunkGeom;
+
+                for (ChunkCoord child : children.keySet()) {
+                    chunkGeom = children.get(child);
+                    rootNode.attachChild(chunkGeom);
+                    bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
                 }
 
-                manager.addChunk(chunk, children, terrain, pathPoints);
-
-                main.enqueue(() -> {
-                    Geometry chunkGeom;
-
-                    for (ChunkCoord child : children.keySet()) {
-                        chunkGeom = children.get(child);
-                        rootNode.attachChild(chunkGeom);
-                        bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
-                    }
-
-                    return null;
-                });
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+                return null;
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
     }
 

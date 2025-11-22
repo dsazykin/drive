@@ -290,11 +290,20 @@ public abstract class Car implements PhysicsTickListener {
     }
 
     /**
-     * Load the assets of this Vehicle.
+     * Load the assets of this Vehicle with physics.
      *
      * @param assetManager for loading assets (not null)
      */
     public void load(AssetManager assetManager, BulletAppState bulletAppState) {
+        // subclasses should override
+    }
+
+    /**
+     * Load the assets of this Vehicle without physics.
+     *
+     * @param assetManager for loading assets (not null)
+     */
+    public void load(AssetManager assetManager) {
         // subclasses should override
     }
 
