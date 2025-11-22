@@ -266,17 +266,17 @@ public class MainMenuState extends BaseAppState {
         // Previous/Next buttons
         Container navigationContainer = carSelectionMenu.addChild(new Container());
 
-        Button prevButton = navigationContainer.addChild(new Button("< Previous"));
-        prevButton.addClickCommands(source -> {
-            currentCarIndex = (currentCarIndex - 1 + availableCars.length) % availableCars.length;
+        Button nextButton = navigationContainer.addChild(new Button("Next >"));
+        nextButton.addClickCommands(source -> {
+            currentCarIndex = (currentCarIndex + 1) % availableCars.length;
             selectedCar = availableCars[currentCarIndex];
             selectedCarLabel.setText(selectedCar);
             loadCarPreview(selectedCar);
         });
 
-        Button nextButton = navigationContainer.addChild(new Button("Next >"));
-        nextButton.addClickCommands(source -> {
-            currentCarIndex = (currentCarIndex + 1) % availableCars.length;
+        Button prevButton = navigationContainer.addChild(new Button("< Previous"));
+        prevButton.addClickCommands(source -> {
+            currentCarIndex = (currentCarIndex - 1 + availableCars.length) % availableCars.length;
             selectedCar = availableCars[currentCarIndex];
             selectedCarLabel.setText(selectedCar);
             loadCarPreview(selectedCar);
@@ -432,6 +432,16 @@ public class MainMenuState extends BaseAppState {
     }
 
     private void loadCarPreview(String carName) {
+        // Wait for physics to be ready
+        if (bulletAppState == null || bulletAppState.getPhysicsSpace() == null) {
+            System.out.println("Physics not ready yet, delaying car load...");
+            sapp.enqueue(() -> {
+                loadCarPreview(carName);
+                return null;
+            });
+            return;
+        }
+
         // Prevent loading the same car twice
         if (isLoadingCar && carName.equals(carBeingLoaded)) {
             System.out.println("Already loading car: " + carName);
