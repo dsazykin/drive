@@ -251,9 +251,6 @@ public class MainMenuState extends BaseAppState {
             car.getControl().setPhysicsLocation(carPos);
         }
 
-        System.out.println("Camera position: " + camPos);
-        System.out.println("Camera direction: " + camDir);
-        System.out.println("Car preview position set to: " + carPos);
     }
 
     private void initCarPreview() {
@@ -285,16 +282,15 @@ public class MainMenuState extends BaseAppState {
 
     private void loadCarPreview(String carName) {
         // Clear existing car model
-        if (currentCarModel != null) {
-            carPreviewNode.detachChild(currentCarModel);
-            currentCarModel = null;
+        if (car != null && car.getCarNode() != null) {
+            carPreviewNode.detachChild(car.getCarNode());
             System.out.println("Removed previous car model");
         }
 
         System.out.println("Loading car preview for: " + carName);
 
         try {
-            // Instantiate the actual car object to get complete model with wheels
+            // Instantiate the actual car object
             car = instantiateCarByName(carName);
 
             if (car == null) {
@@ -304,35 +300,29 @@ public class MainMenuState extends BaseAppState {
 
             System.out.println("Car instantiated: " + car.getClass().getName());
 
-            // Load the car (this creates the full model with wheels)
-            car.load(assetManager);
+            // Load the car (this creates the model)
+            car.load(assetManager, bulletAppState);
 
-            System.out.println("Car loaded successfully");
+            System.out.println("Car loaded and initialized");
 
-            // Get the car's node which contains the complete assembled car
+            // Get the car's node
             currentCarModel = car.getCarNode();
 
             System.out.println("Car node retrieved: " + currentCarModel);
-            if (currentCarModel instanceof Node) {
+            if (currentCarModel != null) {
                 System.out.println("Car node has " + ((Node) currentCarModel).getChildren().size() + " children");
             }
-            System.out.println("Car node local translation: " + currentCarModel.getLocalTranslation());
-            System.out.println("Car node local scale: " + currentCarModel.getLocalScale());
 
-            // Scale up the car VERY significantly so it's visible (increased to 10x)
+            // Scale up the car
             currentCarModel.setLocalScale(3f);
             currentCarModel.setLocalTranslation(0, 0, 0);
             carRotation = 0f;
             carPreviewNode.attachChild(currentCarModel);
 
-            // Force update the parent node's geometric state so child inherits position
+            // Force update
             carPreviewNode.updateGeometricState();
 
             System.out.println("Successfully loaded car model: " + carName);
-            System.out.println("Car model scale after setting to 10x: " + currentCarModel.getLocalScale());
-            System.out.println("Car model bounds: " + currentCarModel.getWorldBound());
-            System.out.println("Car model world position: " + currentCarModel.getWorldTranslation());
-            System.out.println("Car preview node position: " + carPreviewNode.getWorldTranslation());
             System.out.println("Distance from camera: " + cam.getLocation().distance(currentCarModel.getWorldTranslation()));
         } catch (Exception e) {
             System.err.println("Failed to load car preview for " + carName + ": " + e.getMessage());
