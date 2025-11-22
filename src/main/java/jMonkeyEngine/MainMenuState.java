@@ -82,6 +82,10 @@ public class MainMenuState extends BaseAppState {
 
     private static final String MENU_TERRAIN_NAME = "main_menu_terrain";
 
+    private ExecutorService carLoadExecutor = Executors.newSingleThreadExecutor();
+    private volatile boolean isLoadingCar = false;
+    private String carBeingLoaded = null;
+
     @Override
     protected void initialize(Application app) {
         sapp = (SimpleApplication) app;
@@ -388,53 +392,75 @@ public class MainMenuState extends BaseAppState {
     }
 
     private void loadCarPreview(String carName) {
+        // Prevent loading the same car twice
+        if (isLoadingCar && carName.equals(carBeingLoaded)) {
+            System.out.println("Already loading car: " + carName);
+            return;
+        }
+
         // Clear existing car model
         if (car != null && car.getCarNode() != null) {
             carPreviewNode.detachChild(car.getCarNode());
             System.out.println("Removed previous car model");
         }
 
+        isLoadingCar = true;
+        carBeingLoaded = carName;
+
         System.out.println("Loading car preview for: " + carName);
 
-        try {
-            // Instantiate the actual car object
-            car = instantiateCarByName(carName);
+        // Load on background thread
+        carLoadExecutor.submit(() -> {
+            try {
+                // Instantiate and load car on background thread
+                jMonkeyEngine.Entities.Cars.Car loadedCar = instantiateCarByName(carName);
 
-            if (car == null) {
-                System.err.println("Failed to instantiate car: " + carName);
-                return;
+                if (loadedCar == null) {
+                    System.err.println("Failed to instantiate car: " + carName);
+                    isLoadingCar = false;
+                    return;
+                }
+
+                System.out.println("Car instantiated: " + loadedCar.getClass().getName());
+
+                // Load the car model (heavy operation)
+                loadedCar.load(assetManager, bulletAppState);
+
+                System.out.println("Car loaded successfully on background thread");
+
+                // Attach to scene on main render thread
+                sapp.enqueue(() -> {
+                    try {
+                        car = loadedCar;
+                        currentCarModel = car.getCarNode();
+
+                        if (currentCarModel != null) {
+                            currentCarModel.setLocalScale(1f);
+                            currentCarModel.setLocalTranslation(0, 0, 0);
+                            carRotation = 0f;
+                            carPreviewNode.attachChild(currentCarModel);
+                            carPreviewNode.updateGeometricState();
+
+                            System.out.println("Successfully attached car model: " + carName);
+                            System.out.println("Car node has " + ((Node) currentCarModel).getChildren().size() + " children");
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Failed to attach car: " + e.getMessage());
+                        e.printStackTrace();
+                    } finally {
+                        isLoadingCar = false;
+                        carBeingLoaded = null;
+                    }
+                    return null;
+                });
+
+            } catch (Exception e) {
+                System.err.println("Failed to load car preview for " + carName + ": " + e.getMessage());
+                e.printStackTrace();
+                isLoadingCar = false;
+                carBeingLoaded = null;
             }
-
-            System.out.println("Car instantiated: " + car.getClass().getName());
-
-            // Load the car (this creates the model)
-            car.load(assetManager, bulletAppState);
-
-            System.out.println("Car loaded and initialized");
-
-            // Get the car's node
-            currentCarModel = car.getCarNode();
-
-            System.out.println("Car node retrieved: " + currentCarModel);
-            if (currentCarModel != null) {
-                System.out.println("Car node has " + ((Node) currentCarModel).getChildren().size() + " children");
-            }
-
-            // Scale up the car
-            currentCarModel.setLocalScale(1f);
-            currentCarModel.setLocalTranslation(0, 0, 0);
-            carRotation = 0f;
-            carPreviewNode.attachChild(currentCarModel);
-
-            // Force update
-            carPreviewNode.updateGeometricState();
-
-            System.out.println("Successfully loaded car model: " + carName);
-            System.out.println("Distance from camera: " + cam.getLocation().distance(currentCarModel.getWorldTranslation()));
-        } catch (Exception e) {
-            System.err.println("Failed to load car preview for " + carName + ": " + e.getMessage());
-            e.printStackTrace();
-        }
+        });
     }
 
     private jMonkeyEngine.Entities.Cars.Car instantiateCarByName(String carName) {
@@ -493,6 +519,12 @@ public class MainMenuState extends BaseAppState {
     protected void cleanup(Application app) {
         // Clean up car preview
         cleanupCarPreview();
+
+        // Shutdown car loading executor
+        if (carLoadExecutor != null && !carLoadExecutor.isShutdown()) {
+            carLoadExecutor.shutdownNow();
+            carLoadExecutor = null;
+        }
 
         // Clean up menus
         if (menu != null) {
