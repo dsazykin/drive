@@ -23,21 +23,20 @@ public class ChunkManager {
     private final ExecutorService executor;
 
     private final int CHUNK_SIZE;
-    private final int PARENT_SIZE;
     private final float SCALE;
     private final int RENDER_DISTANCE;
 
     Set<ChunkCoord> loadingChunks = ConcurrentHashMap.newKeySet();
     Set<ChunkCoord> loadingHeightmaps = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<ChunkCoord, Geometry> loadedChunks = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<ChunkCoord, ConcurrentHashMap<ChunkCoord, Geometry>> generatedChunks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ChunkCoord, Geometry> generatedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, float[][]> generatedHeightmaps = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>> generatedRoads =
             new ConcurrentHashMap<>();
 
     public ChunkManager(BulletAppState bulletAppState, Node rootNode, RoadGenerator road,
                         TerrainGenerator generator, SimpleApplication main, ExecutorService executor,
-                        int chunkSize, int parentSize, float scale, int renderDistance) {
+                        int chunkSize, float scale, int renderDistance) {
         this.rootNode = rootNode;
         this.bulletAppState = bulletAppState;
         this.generator = generator;
@@ -45,17 +44,13 @@ public class ChunkManager {
         this.main = main;
         this.executor = executor;
         this.CHUNK_SIZE = chunkSize;
-        this.PARENT_SIZE = parentSize;
         this.SCALE = scale;
         this.RENDER_DISTANCE = renderDistance;
     }
 
-    public void addChunk(ChunkCoord thisChunk, ConcurrentHashMap<ChunkCoord, Geometry> children,
+    public void addChunk(ChunkCoord thisChunk, Geometry geometry,
                          float[][] heightmap, List<jMonkeyEngine.Road.Node> nodes) {
-        for (ChunkCoord chunk : children.keySet()) {
-            loadedChunks.put(chunk, children.get(chunk));
-        }
-        generatedChunks.put(thisChunk, children);
+        generatedChunks.put(thisChunk, geometry);
         generatedHeightmaps.put(thisChunk, heightmap);
         generatedRoads.put(thisChunk, nodes);
     }
@@ -78,22 +73,18 @@ public class ChunkManager {
                     loadingChunks.add(chunk);
                     executor.submit(() -> {
                         try {
-                            Geometry chunkGeom;
-
-                            ChunkCoord parent = getParentChunk(chunk);
-
-                            if (!generatedHeightmaps.containsKey(parent) && !loadingHeightmaps.contains(parent)) {
-                                loadingHeightmaps.add(parent);
-                                float[][] terrain = generator.generateHeightMap(parent);
+                            if (!generatedHeightmaps.containsKey(chunk) && !loadingHeightmaps.contains(chunk)) {
+                                loadingHeightmaps.add(chunk);
+                                float[][] terrain = generator.generateHeightMap(chunk);
 
                                 // Generate road if this parent chunk is on the road's path
                                 // Road progresses along X-axis but can move between Z-chunks
-                                if (parent.x == road.currentXChunk && parent.z == road.currentZChunk) {
+                                if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk) {
                                     int startZ = road.lastZCoord;
 
                                     // Check if we're entering from a previous Z-chunk
-                                    ChunkCoord prevZChunk = new ChunkCoord(parent.x, parent.z - 1);
-                                    ChunkCoord nextZChunk = new ChunkCoord(parent.x, parent.z + 1);
+                                    ChunkCoord prevZChunk = new ChunkCoord(chunk.x, chunk.z - 1);
+                                    ChunkCoord nextZChunk = new ChunkCoord(chunk.x, chunk.z + 1);
 
                                     // If previous Z-chunk exists and has a road, we're entering from south
                                     if (generatedRoads.containsKey(prevZChunk)) {
@@ -108,20 +99,20 @@ public class ChunkManager {
                                         List<jMonkeyEngine.Road.Node> nextRoad = generatedRoads.get(nextZChunk);
                                         if (!nextRoad.isEmpty()) {
                                             jMonkeyEngine.Road.Node firstNode = nextRoad.get(0);
-                                            startZ = PARENT_SIZE - 1;
+                                            startZ = CHUNK_SIZE - 1;
                                         }
                                     }
 
                                     List<jMonkeyEngine.Road.Node> pathPoints =
                                             road.getRoadPointsInChunk(terrain, 0, startZ,
-                                                                      PARENT_SIZE - 1,
-                                                                      PARENT_SIZE / 2);
-                                    generator.updateHeightMap(terrain, pathPoints);
-                                    generatedRoads.put(parent, pathPoints);
+                                                                      CHUNK_SIZE - 1,
+                                                                      CHUNK_SIZE / 2);
+                                    generator.updateHeightMap(terrain, pathPoints, chunk);
+                                    generatedRoads.put(chunk, pathPoints);
 
                                     // Update Z-chunk position if road crossed a Z boundary
                                     jMonkeyEngine.Road.Node lastNode = pathPoints.get(pathPoints.size() - 1);
-                                    if (lastNode.y >= PARENT_SIZE - 1) {
+                                    if (lastNode.y >= CHUNK_SIZE - 1) {
                                         // Road exited through north boundary, move to next Z-chunk
                                         road.currentZChunk += 1;
                                     } else if (lastNode.y <= 0) {
@@ -130,33 +121,12 @@ public class ChunkManager {
                                     }
                                 }
 
-                                generatedHeightmaps.put(parent, terrain);
-                                loadingHeightmaps.remove(parent);
+                                generatedHeightmaps.put(chunk, terrain);
+                                loadingHeightmaps.remove(chunk);
                             }
 
-                            ConcurrentHashMap<ChunkCoord, Geometry> children = new ConcurrentHashMap<>();
-                            if (generatedChunks.containsKey(parent)) {
-                                children = generatedChunks.get(parent);
-                            }
-
-                            if (children.containsKey(chunk)) {
-                                chunkGeom = children.get(chunk);
-                            } else {
-                                float[][] terrain = generatedHeightmaps.get(parent);
-                                if (terrain == null) {
-                                    loadingChunks.remove(chunk);
-                                    return;
-                                }
-                                chunkGeom = getChild(terrain, parent, chunk);
-
-                                if (generatedChunks.containsKey(parent)) {
-                                    generatedChunks.get(parent).put(chunk, chunkGeom);
-                                } else {
-                                    children.put(chunk, chunkGeom);
-                                    generatedChunks.put(parent, children);
-                                }
-
-                            }
+                            Mesh mesh = generator.generateChunkMesh(generatedHeightmaps.get(chunk));
+                            Geometry chunkGeom = generator.createGeometry(chunk, mesh);
 
                             loadedChunks.put(chunk, chunkGeom);
                             loadingChunks.remove(chunk);
@@ -169,6 +139,8 @@ public class ChunkManager {
                             });
                         } catch (Exception e) {
                             e.printStackTrace();
+                        } finally {
+                            loadingChunks.remove(chunk);
                         }
                     });
                 }
@@ -188,24 +160,6 @@ public class ChunkManager {
         });
     }
 
-    private ChunkCoord getParentChunk(ChunkCoord childChunk) {
-        int parentX = Math.floorDiv(childChunk.x * CHUNK_SIZE, PARENT_SIZE);
-        int parentZ = Math.floorDiv(childChunk.z * CHUNK_SIZE, PARENT_SIZE);
-        return new ChunkCoord(parentX, parentZ);
-    }
-
-    public Geometry getChild(float[][] parentHeightmap, ChunkCoord parentCoord, ChunkCoord childCoord) {
-        int localChildX = childCoord.x - parentCoord.x * (PARENT_SIZE / CHUNK_SIZE);
-        int localChildZ = childCoord.z - parentCoord.z * (PARENT_SIZE / CHUNK_SIZE);
-
-        int cx = localChildX * CHUNK_SIZE;
-        int cz = localChildZ * CHUNK_SIZE;
-
-        Mesh mesh = generator.generateChunkMesh(parentHeightmap, cx, cz);
-
-        return generator.createGeometry(childCoord, mesh);
-    }
-
     public float getHeight(int MAX_HEIGHT, int x, int z, ChunkCoord chunk) {
         float[][] heightMap = generatedHeightmaps.get(chunk);
         return (heightMap[x][z] - 2) * MAX_HEIGHT;
@@ -213,7 +167,7 @@ public class ChunkManager {
 
     public Vector3f getCamDirection(float height) {
         List<jMonkeyEngine.Road.Node> nodes = generatedRoads.get(new ChunkCoord(0, 0));
-        jMonkeyEngine.Road.Node point = nodes.get(40);
+        jMonkeyEngine.Road.Node point = nodes.get(1);
         System.out.println(point.x * (SCALE / 16));
         System.out.println(point.y * (SCALE / 16));
         return new Vector3f(point.x * (SCALE / 16), height - 15,
@@ -224,7 +178,7 @@ public class ChunkManager {
         return generatedRoads.get(chunk);
     }
 
-    public ConcurrentHashMap<ChunkCoord, Geometry> getChunk(ChunkCoord chunk) {
+    public Geometry getChunk(ChunkCoord chunk) {
         return generatedChunks.get(chunk);
     }
 }

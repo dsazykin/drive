@@ -63,7 +63,7 @@ public class MainMenuState extends BaseAppState {
 
     private boolean showingCarSelection = false;
 
-    private final int CHUNK_SIZE = 1000;
+    private final int CHUNK_SIZE = 200;
     private final float SCALE = 40f;
     private long SEED = 12345L; // Fixed seed for consistent menu terrain
 
@@ -126,9 +126,9 @@ public class MainMenuState extends BaseAppState {
 
         road = new RoadGenerator();
         generator = new TerrainGenerator(bulletAppState, backgroundNode, assetManager, road, sapp, executor,
-                                         200, CHUNK_SIZE, SCALE, SEED, 200);
+                                         CHUNK_SIZE, SCALE, SEED, 200);
         manager = new ChunkManager(bulletAppState, backgroundNode, road, generator, sapp, executor,
-                                   200, CHUNK_SIZE, SCALE, 1);
+                                   CHUNK_SIZE, SCALE, 1);
         generator.setChunkManager(manager);
 
         // Load on background thread
@@ -159,8 +159,8 @@ public class MainMenuState extends BaseAppState {
                             });
                         }
 
-                        System.out.println("Saved generated geometries count: " +
-                                                   generator.getGeneratedChildGeometries().size());
+//                        System.out.println("Saved generated geometries count: " +
+//                                                   generator.getGeneratedChildGeometries().size());
 
                         // Set camera target
                         float chunkCenterX = (CHUNK_SIZE / 2f) * (SCALE / 16f);

@@ -18,7 +18,6 @@ public class TerrainSerializer {
         public float[][] heightMap;
         public Map<ChunkCoord, ChunkData> chunks;
         public List<jMonkeyEngine.Road.Node> pathPoints;
-        public int parentSize;
         public int chunkSize;
         public float scale;
         public long seed;
@@ -37,7 +36,7 @@ public class TerrainSerializer {
     public static boolean saveTerrain(String name, float[][] heightMap,
                                      Map<ChunkCoord, ?> chunks,
                                      List<jMonkeyEngine.Road.Node> pathPoints,
-                                     int parentSize, int chunkSize, float scale, long seed) {
+                                     int chunkSize, float scale, long seed) {
         File dir = new File(TERRAIN_DIR + name);
         if (!dir.exists()) {
             dir.mkdirs();
@@ -48,7 +47,6 @@ public class TerrainSerializer {
             data.heightMap = heightMap;
             data.chunks = new HashMap<>();
             data.pathPoints = pathPoints;
-            data.parentSize = parentSize;
             data.chunkSize = chunkSize;
             data.scale = scale;
             data.seed = seed;

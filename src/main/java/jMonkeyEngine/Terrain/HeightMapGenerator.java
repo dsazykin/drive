@@ -48,10 +48,15 @@ public class HeightMapGenerator {
             }
         }
 
+        try {
+            generateImage(chunkX, chunkZ, heightmap);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         return heightmap;
     }
 
-    public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath) {
+    public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath, ChunkCoord chunk) {
         float roadWidth = 6f;
         float halfWidth = roadWidth / 2f;
 
@@ -120,6 +125,12 @@ public class HeightMapGenerator {
         smoothRoad(heightmap, hasTarget, targetHeights);
 
         blendTerrain(heightmap, hasTarget, targetHeights);
+
+        try {
+            generateImage(chunk.x, chunk.z, heightmap);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static void smoothRoad(float[][] heightmap, boolean[][] hasTarget,
@@ -253,7 +264,7 @@ public class HeightMapGenerator {
                 ChunkCoord chunk = new ChunkCoord(x, z);
                 float[][] heightmap = generator.generateHeightmap(chunk.x, chunk.z);
                 List<Node> path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
-                generator.applyRoadFlattening(heightmap, path);
+                generator.applyRoadFlattening(heightmap, path, chunk);
                 generator.generateImage(chunk.x, chunk.z, heightmap);
             }
         }

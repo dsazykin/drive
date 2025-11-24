@@ -37,7 +37,6 @@ public class TerrainGenerator{
     private final ExecutorService executor;
 
     private final int CHUNK_SIZE;
-    private final int PARENT_SIZE;
     private final float SCALE;
     private final Long SEED;
     private final int MAX_HEIGHT;
@@ -45,13 +44,13 @@ public class TerrainGenerator{
     private List<Future<?>> chunkTasks;
 
     // Saved data for reuse
-    private ConcurrentHashMap<ChunkCoord, Geometry> generatedChildGeometries = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<ChunkCoord, Geometry> generatedGeometries = new ConcurrentHashMap<>();
     private float[][] lastGeneratedTerrain;
     private List<jMonkeyEngine.Road.Node> lastPathPoints;
 
     public TerrainGenerator(BulletAppState bulletAppState,
                             Node rootNode, AssetManager assetManager, RoadGenerator road, SimpleApplication main,
-                            ExecutorService executor, int chunkSize, int parentSize, float SCALE, Long seed,
+                            ExecutorService executor, int chunkSize, float SCALE, Long seed,
                             int maxHeight) {
         this.bulletAppState = bulletAppState;
         this.rootNode = rootNode;
@@ -60,11 +59,10 @@ public class TerrainGenerator{
         this.main = main;
         this.executor = executor;
         this.CHUNK_SIZE = chunkSize;
-        this.PARENT_SIZE = parentSize;
         this.SCALE = SCALE;
         this.SEED = seed;
         MAX_HEIGHT = maxHeight;
-        this.heightMap = new HeightMapGenerator(SEED, PARENT_SIZE, SCALE);
+        this.heightMap = new HeightMapGenerator(SEED, CHUNK_SIZE, SCALE);
     }
 
     public void setChunkManager(ChunkManager manager) {
@@ -75,11 +73,11 @@ public class TerrainGenerator{
         return heightMap.generateHeightmap(chunk.x, chunk.z);
     }
 
-    public void updateHeightMap(float[][] terrain, List<jMonkeyEngine.Road.Node> pathPoints) {
-        heightMap.applyRoadFlattening(terrain, pathPoints);
+    public void updateHeightMap(float[][] terrain, List<jMonkeyEngine.Road.Node> pathPoints, ChunkCoord chunk) {
+        heightMap.applyRoadFlattening(terrain, pathPoints, chunk);
     }
 
-    public Mesh generateChunkMesh(float[][] terrain, int cx, int cz){
+    public Mesh generateChunkMesh(float[][] terrain){
         Mesh mesh = new Mesh();
 
         Vector3f[] vertices = new Vector3f[CHUNK_SIZE * CHUNK_SIZE];
@@ -87,7 +85,7 @@ public class TerrainGenerator{
         int vertexIndex = 0;
         for (int z = 0; z < CHUNK_SIZE; z++) {
             for (int x = 0; x < CHUNK_SIZE; x++) {
-                float height = terrain[cx + x][cz + z];
+                float height = terrain[x][z];
 
                 ColorRGBA color;
                 if (height < 0.1f) {
@@ -225,9 +223,6 @@ public class TerrainGenerator{
         return chunkGeom;
     }
 
-    public ConcurrentHashMap<ChunkCoord, Geometry> getGeneratedChildGeometries() {
-        return generatedChildGeometries;
-    }
     public float[][] getLastGeneratedTerrain() {
         return lastGeneratedTerrain;
     }
@@ -247,9 +242,8 @@ public class TerrainGenerator{
         return TerrainSerializer.saveTerrain(
             name,
             lastGeneratedTerrain,
-            generatedChildGeometries,
+            generatedGeometries,
             lastPathPoints,
-            PARENT_SIZE,
             CHUNK_SIZE,
             SCALE,
             SEED
@@ -267,7 +261,7 @@ public class TerrainGenerator{
         }
 
         // Verify compatibility
-        if (data.parentSize != PARENT_SIZE || data.chunkSize != CHUNK_SIZE) {
+        if (data.chunkSize != CHUNK_SIZE) {
             System.err.println("Saved terrain size mismatch!");
             return false;
         }
@@ -277,27 +271,19 @@ public class TerrainGenerator{
         lastPathPoints = data.pathPoints;
 
         // Regenerate geometries from heightmap
-        ConcurrentHashMap<ChunkCoord, Geometry> children = new ConcurrentHashMap<>();
         ChunkCoord rootChunk = new ChunkCoord(0, 0);
+        Geometry chunkGeom = manager.getChunk(rootChunk);
 
-        for (int x = 0; x < PARENT_SIZE / CHUNK_SIZE; x++) {
-            for (int z = 0; z < PARENT_SIZE / CHUNK_SIZE; z++) {
-                ChunkCoord childCoord = new ChunkCoord(x, z);
-                children.put(childCoord, manager.getChild(data.heightMap, rootChunk, childCoord));
-            }
-        }
+        generatedGeometries.clear();
+        generatedGeometries.put(rootChunk, chunkGeom);
 
-        generatedChildGeometries.clear();
-        generatedChildGeometries.putAll(children);
-
-        manager.addChunk(rootChunk, children, data.heightMap, data.pathPoints);
+        manager.addChunk(rootChunk, chunkGeom, data.heightMap, data.pathPoints);
 
         main.enqueue(() -> {
-            for (ChunkCoord child : children.keySet()) {
-                Geometry chunkGeom = children.get(child);
+
                 rootNode.attachChild(chunkGeom);
                 bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
-            }
+
             return null;
         });
 
@@ -312,34 +298,24 @@ public class TerrainGenerator{
         try {
             float[][] terrain = generateHeightMap(chunk);
             List<jMonkeyEngine.Road.Node> pathPoints =
-                    road.getRoadPointsInChunk(terrain, 0, PARENT_SIZE / 2, PARENT_SIZE - 1,
-                                              PARENT_SIZE / 2);
-            updateHeightMap(terrain, pathPoints);
+                    road.getRoadPointsInChunk(terrain, 0, CHUNK_SIZE / 2, CHUNK_SIZE - 1,
+                                              CHUNK_SIZE / 2);
+            updateHeightMap(terrain, pathPoints, chunk);
 
-            ConcurrentHashMap<ChunkCoord, Geometry> children = new ConcurrentHashMap<>();
-            ChunkCoord childCoord;
+            Mesh mesh = generateChunkMesh(terrain);
+            Geometry chunkGeom = createGeometry(chunk, mesh);
 
-            for (int x = 0; x < PARENT_SIZE / CHUNK_SIZE; x++) {
-                for (int z = 0; z < PARENT_SIZE / CHUNK_SIZE; z++) {
-                    childCoord = new ChunkCoord(x, z);
-                    children.put(childCoord, manager.getChild(terrain, chunk, childCoord));
-                }
-            }
             // Save for later reuse
-            generatedChildGeometries.clear();
-            generatedChildGeometries.putAll(children);
+            generatedGeometries.clear();
+            generatedGeometries.put(chunk, chunkGeom);
             lastGeneratedTerrain = terrain;
             lastPathPoints = pathPoints;
 
-            manager.addChunk(chunk, children, terrain, pathPoints);
+            manager.addChunk(chunk, chunkGeom, terrain, pathPoints);
             main.enqueue(() -> {
-                Geometry chunkGeom;
 
-                for (ChunkCoord child : children.keySet()) {
-                    chunkGeom = children.get(child);
-                    rootNode.attachChild(chunkGeom);
-                    bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
-                }
+                rootNode.attachChild(chunkGeom);
+                bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
 
                 return null;
             });

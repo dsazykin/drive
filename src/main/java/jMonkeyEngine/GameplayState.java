@@ -82,7 +82,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
     private boolean followCam = false;
     private boolean gui = false;
 
-    private final int CHUNK_SIZE = 1000;
+    private final int CHUNK_SIZE = 200;
     private final float SCALE = 40f;
     private long SEED;
 
@@ -126,10 +126,10 @@ public class GameplayState extends BaseAppState implements ActionListener {
         updateLoadingStage("Initializing terrain generator...");
         road = new RoadGenerator();
         generator = new TerrainGenerator(bulletAppState, gameplayRoot, assetManager, road, sapp, executor,
-                                         200, CHUNK_SIZE, SCALE, SEED, 200);
+                                         CHUNK_SIZE, SCALE, SEED, 200);
         this.manager =
                 new ChunkManager(bulletAppState, gameplayRoot, road, generator, sapp, executor,
-                                 200, CHUNK_SIZE, SCALE, 2);
+                                 CHUNK_SIZE, SCALE, 2);
         generator.setChunkManager(manager);
 
         updateLoadingStage("Generating terrain...");
@@ -137,8 +137,8 @@ public class GameplayState extends BaseAppState implements ActionListener {
         System.out.println("loaded terrain");
 
         updateLoadingStage("Calculating spawn point...");
-        int zSpawn = (int) ((CHUNK_SIZE / 2) * (SCALE / 16));
-        float spawnHeight = manager.getHeight(200, 0, 500, new ChunkCoord(0, 0));
+        int zSpawn = (CHUNK_SIZE / 2);
+        float spawnHeight = manager.getHeight(200, 0, zSpawn, new ChunkCoord(0, 0));
         resetPoint = new Vector3f(5f, spawnHeight + 1f, zSpawn);
         System.out.println("got reset point");
 
@@ -226,8 +226,8 @@ public class GameplayState extends BaseAppState implements ActionListener {
 
         if (loadingDone) {
             VehicleControl control = car.getControl();
-//            manager.updateChunks(car.getCarNode().getWorldTranslation());
-            manager.updateChunks(cam.getLocation());
+            manager.updateChunks(car.getCarNode().getWorldTranslation());
+            //manager.updateChunks(cam.getLocation());
 
             // 1. Get current speed
             float speed = control.getCurrentVehicleSpeedKmHour();
