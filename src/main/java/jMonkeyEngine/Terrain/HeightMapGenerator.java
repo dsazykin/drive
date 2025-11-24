@@ -48,11 +48,11 @@ public class HeightMapGenerator {
             }
         }
 
-        try {
-            generateImage(chunkX, chunkZ, heightmap);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+//        try {
+//            generateImage(chunkX, chunkZ, heightmap);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
         return heightmap;
     }
 
@@ -126,11 +126,11 @@ public class HeightMapGenerator {
 
         blendTerrain(heightmap, hasTarget, targetHeights);
 
-        try {
-            generateImage(chunk.x, chunk.z, heightmap);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+//        try {
+//            generateImage(chunk.x, chunk.z, heightmap);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
     }
 
     private static void smoothRoad(float[][] heightmap, boolean[][] hasTarget,
@@ -263,8 +263,33 @@ public class HeightMapGenerator {
             for (int z = -1; z < 2; z++) {
                 ChunkCoord chunk = new ChunkCoord(x, z);
                 float[][] heightmap = generator.generateHeightmap(chunk.x, chunk.z);
-                List<Node> path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
-                generator.applyRoadFlattening(heightmap, path, chunk);
+                List<Node> path = null;
+                if (x == 0 && z == 0) {
+                    path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
+                } else {
+                    Integer startX;
+                    Integer startZ;
+                    if (road.currentXChunk == chunk.x && road.currentZChunk == chunk.z) {
+                        if (road.verticalExitUp) {
+                            startZ = 0;
+                            startX = road.lastXCoord;
+                        } else if (road.verticalExitDown) {
+                            startZ = chunkSize - 1;
+                            startX = road.lastXCoord;
+                        } else {
+                            startZ = road.lastZCoord;
+                            startX = 0;
+                        }
+                        System.out.println(startX);
+                        System.out.println(startZ);
+                        path = road.getRoadPointsInChunk(heightmap, startX,
+                                                         startZ, chunkSize - 1,
+                                                         chunkSize / 2);
+                    }
+                }
+                if (path != null) {
+                    generator.applyRoadFlattening(heightmap, path, chunk);
+                }
                 generator.generateImage(chunk.x, chunk.z, heightmap);
             }
         }

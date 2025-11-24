@@ -5,8 +5,11 @@ import java.util.*;
 public class RoadGenerator {
 
     public int currentXChunk = 0;
-    public int currentZChunk = 0; // Track which Z-chunk the road is currently in
-    public int lastZCoord;
+    public int currentZChunk = 0;
+    public Integer lastZCoord = null;
+    public Integer lastXCoord = null;
+    public boolean verticalExitUp = false;
+    public boolean verticalExitDown = false;
 
     private List<int[]> generateOffsets(int radius) {
         List<int[]> offsets = new ArrayList<>();
@@ -26,6 +29,9 @@ public class RoadGenerator {
         int rows = heightmap.length;
         int cols = heightmap[0].length;
 
+        verticalExitUp = false;
+        verticalExitDown = false;
+
         PriorityQueue<Node> openSet = new PriorityQueue<>();
         boolean[][] visited = new boolean[rows][cols];
         Node[][] nodeMap = new Node[rows][cols];
@@ -43,7 +49,11 @@ public class RoadGenerator {
             }
 
             // Allow exit through Z-boundaries if the path leads there
-            if (current.y >= cols - 1 || current.y <= 0) {
+            if (current.y >= cols - 1) {
+                verticalExitUp = true;
+                return reconstructPath(current);
+            } else if (current.y <= 0) {
+                verticalExitDown = true;
                 return reconstructPath(current);
             }
 
@@ -141,8 +151,16 @@ public class RoadGenerator {
     }
 
     private List<Node> reconstructPath(Node end) {
-        lastZCoord = end.y;
-        currentXChunk += 1;
+        if (verticalExitUp) {
+            currentZChunk++;
+            lastXCoord = end.x;
+        } else if (verticalExitDown) {
+            currentZChunk--;
+            lastXCoord = end.x;
+        } else {
+            currentXChunk++;
+            lastZCoord = end.y;
+        }
 
         // Check if the road crossed into a different Z-chunk
         // Assuming PARENT_SIZE is accessible or passed in, we need to detect boundary crossing
