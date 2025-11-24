@@ -5,6 +5,7 @@ import java.util.*;
 public class RoadGenerator {
 
     public int currentXChunk = 0;
+    public int currentZChunk = 0; // Track which Z-chunk the road is currently in
     public int lastZCoord;
 
     private List<int[]> generateOffsets(int radius) {
@@ -35,13 +36,20 @@ public class RoadGenerator {
 
         while (!openSet.isEmpty()) {
             Node current = openSet.poll();
-            if (current.x == goalX) {
+
+            // Primary goal: reach the far X boundary (main direction)
+            if (current.x >= goalX) {
                 return reconstructPath(current);
             }
 
-            visited[current.x][current.y] = true;
+            // Allow exit through Z-boundaries if the path leads there
+            if (current.y >= cols - 1 || current.y <= 0) {
+                return reconstructPath(current);
+            }
 
-            List<int[]> directions = generateOffsets(5);
+            //visited[current.x][current.y] = true;
+
+            List<int[]> directions = generateOffsets(3);
             for (int[] dir : directions) {
                 int nx = current.x + dir[0];
                 int ny = current.y + dir[1];
@@ -49,6 +57,9 @@ public class RoadGenerator {
                 if (nx >= 0 && ny >= 0 && nx < rows && ny < cols && !visited[nx][ny]) {
                     int dx = dir[0];
                     int dy = dir[1];
+
+                    // Discourage backward movement in X (we want to progress forward)
+                    if (dx < 0) continue;
 
                     float dot = current.dxFromParent * dx + current.dyFromParent * dy;
                     float mag2 = dx * dx + dy * dy;
@@ -65,7 +76,11 @@ public class RoadGenerator {
                         float heightDiff = Math.abs(heightmap[current.x][current.y] - heightmap[nx][ny]);
 
                         float distance = (float) Math.sqrt(dx * dx + dy * dy);
-                        float baseCost = distance * 10f;
+
+                        // Add bonus for X-progression (negative cost = preferred)
+                        // This encourages the road to move along X-axis
+                        float xProgressBonus = dx > 0 ? -30f * dx : 0;
+                        float baseCost = distance * 10f + xProgressBonus;
 
                         float moveCost = baseCost + (heightWeight * heightDiff);
 
@@ -78,10 +93,11 @@ public class RoadGenerator {
 
                         Node neighbor = nodeMap[nx][ny];
                         if (neighbor == null || tentativeG < neighbor.gCost) {
-                            int h = heuristic(nx, ny, goalX, goalY);
+                            float h = heuristic(nx, ny, goalX, goalY);
                             neighbor = new Node(nx, ny, roadHeight, tentativeG, tentativeG + h, current, dx, dy);
                             nodeMap[nx][ny] = neighbor;
                             openSet.add(neighbor);
+                            visited[nx][ny] = true; // Mark as visited when adding to queue
                         }
                     }
                 }
@@ -120,13 +136,19 @@ public class RoadGenerator {
         return sum / points;
     }
 
-    private int heuristic(int x1, int y1, int x2, int y2) {
+    private float heuristic(int x1, int y1, int x2, int y2) {
         return Math.abs(x1 - x2) + Math.abs(y1 - y2);
     }
 
     private List<Node> reconstructPath(Node end) {
         lastZCoord = end.y;
         currentXChunk += 1;
+
+        // Check if the road crossed into a different Z-chunk
+        // Assuming PARENT_SIZE is accessible or passed in, we need to detect boundary crossing
+        // If end.y is near 0, we entered from the south (previous Z-chunk was currentZChunk - 1)
+        // If end.y is near PARENT_SIZE-1, we're exiting to the north (next Z-chunk will be currentZChunk + 1)
+        // For now, we'll update this based on where we exited
 
         List<Node> path = new ArrayList<>();
         Node current = end;

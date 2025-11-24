@@ -226,7 +226,8 @@ public class GameplayState extends BaseAppState implements ActionListener {
 
         if (loadingDone) {
             VehicleControl control = car.getControl();
-            manager.updateChunks(car.getCarNode().getWorldTranslation());
+//            manager.updateChunks(car.getCarNode().getWorldTranslation());
+            manager.updateChunks(cam.getLocation());
 
             // 1. Get current speed
             float speed = control.getCurrentVehicleSpeedKmHour();

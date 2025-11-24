@@ -1,6 +1,7 @@
 package jMonkeyEngine.Terrain;
 
 import com.jme3.math.FastMath;
+import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Road.Node;
 import jMonkeyEngine.Road.RoadGenerator;
 import java.awt.*;
@@ -230,15 +231,15 @@ public class HeightMapGenerator {
 
     public static void main(String[] args) throws IOException {
         Long seed = 946496062586794636L;
-        int chunkSize = 500;
+        int chunkSize = 200;
         float scale = 40;
         HeightMapGenerator generator = new HeightMapGenerator(seed, chunkSize, scale);
         RoadGenerator road = new RoadGenerator();
 
-        float[][] heightmap = generator.generateHeightmap(0, 0);
-        List<Node> path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
-        generator.applyRoadFlattening(heightmap, path);
-        generator.generateImage(0, 0, heightmap);
+//        float[][] heightmap = generator.generateHeightmap(0, 0);
+//        List<Node> path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
+//        generator.applyRoadFlattening(heightmap, path);
+//        generator.generateImage(0, 0, heightmap);
 
 //        for (int i = 0; i < heightmap.length; i++) {
 //            for (int j = 0; j < heightmap[i].length; j++) {
@@ -247,13 +248,14 @@ public class HeightMapGenerator {
 //            System.out.println();
 //        }
 
-//        for (int x = -1; x < 2; x++) {
-//            for (int z = -1; z < 2; z++) {
-//                float[][] heightmap = generator.generateHeightmap(500, 500, seed, 40, x, z);
-//                List<Vector2f> roadPoints = road.getRoadPointsInChunk(x, z, heightmap);
-//                generator.applyRoadFlattening(heightmap, 500, 500, x, z, roadPoints);
-//                generator.generateImage(500, 500, x, z, heightmap);
-//            }
-//        }
+        for (int x = -1; x < 2; x++) {
+            for (int z = -1; z < 2; z++) {
+                ChunkCoord chunk = new ChunkCoord(x, z);
+                float[][] heightmap = generator.generateHeightmap(chunk.x, chunk.z);
+                List<Node> path = road.getRoadPointsInChunk(heightmap, 0, chunkSize / 2, chunkSize - 1, chunkSize / 2);
+                generator.applyRoadFlattening(heightmap, path);
+                generator.generateImage(chunk.x, chunk.z, heightmap);
+            }
+        }
     }
 }
