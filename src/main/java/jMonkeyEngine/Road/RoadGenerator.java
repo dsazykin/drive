@@ -40,6 +40,13 @@ public class RoadGenerator {
         openSet.add(start);
         nodeMap[startX][startY] = start;
 
+        // Determine entry boundary
+        boolean enteredFromTop = (startY >= cols - 1);
+        boolean enteredFromBottom = (startY <= 0);
+
+        // Minimum distance to travel before allowing exit through entry boundary
+        final int MIN_PROGRESS = 30; // Adjust this value as needed
+
         while (!openSet.isEmpty()) {
             Node current = openSet.poll();
 
@@ -48,13 +55,25 @@ public class RoadGenerator {
                 return reconstructPath(current);
             }
 
-            // Allow exit through Z-boundaries if the path leads there
-            if (current.y >= cols - 1) {
-                verticalExitUp = true;
-                return reconstructPath(current);
-            } else if (current.y <= 0) {
-                verticalExitDown = true;
-                return reconstructPath(current);
+            // Calculate how far we've traveled into the chunk
+            int distanceFromStart = Math.abs(current.y - startY);
+
+            // Allow exit through Z-boundaries
+            if (current.parent != null) {
+                // Prevent immediate exit through entry boundary (unless we've traveled far enough)
+                boolean canExitThroughEntry = distanceFromStart >= MIN_PROGRESS;
+
+                if (current.y <= 0) {
+                    if (!enteredFromBottom || canExitThroughEntry) {
+                        verticalExitDown = true;
+                        return reconstructPath(current);
+                    }
+                } else if (current.y >= cols - 1) {
+                    if (!enteredFromTop || canExitThroughEntry) {
+                        verticalExitUp = true;
+                        return reconstructPath(current);
+                    }
+                }
             }
 
             //visited[current.x][current.y] = true;
@@ -81,7 +100,7 @@ public class RoadGenerator {
                     }
 
                     if (cosAngle > 0) {
-                        float heightWeight = 10000.0f * (rows * 2);
+                        float heightWeight = 100.0f * (rows * 2);
 
                         float heightDiff = Math.abs(heightmap[current.x][current.y] - heightmap[nx][ny]);
 
@@ -94,8 +113,8 @@ public class RoadGenerator {
 
                         float moveCost = baseCost + (heightWeight * heightDiff);
 
-                        //                        float angleCos = (mag1 == 0 || mag2 == 0) ? 1 : dot / (mag1 * mag2);
-                        //                        float anglePenalty = (1 - angleCos) * -10; // more penalty for sharper turns
+//                        float angleCos = (mag1 == 0 || mag2 == 0) ? 1 : dot / (mag1 * mag2);
+//                        float anglePenalty = (1 - angleCos) * -10; // more penalty for sharper turns
 
                         float tentativeG = current.gCost + moveCost;
 

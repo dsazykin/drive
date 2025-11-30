@@ -28,6 +28,7 @@ public class ChunkManager {
 
     Set<ChunkCoord> loadingChunks = ConcurrentHashMap.newKeySet();
     Set<ChunkCoord> loadingHeightmaps = ConcurrentHashMap.newKeySet();
+    Set<ChunkCoord> loadingRoads = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<ChunkCoord, Geometry> loadedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, Geometry> generatedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, float[][]> generatedHeightmaps = new ConcurrentHashMap<>();
@@ -87,23 +88,35 @@ public class ChunkManager {
                                 generateRoad(terrain, chunk);
                             }
 
-                            Mesh mesh = generator.generateChunkMesh(terrain);
-                            Geometry chunkGeom = generator.createGeometry(chunk, mesh);
-
-                            loadedChunks.put(chunk, chunkGeom);
-                            loadingChunks.remove(chunk);
-
-                            main.enqueue(() -> {
-                                rootNode.attachChild(chunkGeom);
-                                bulletAppState.getPhysicsSpace().add(
-                                        chunkGeom.getControl(RigidBodyControl.class));
-
-                            });
+                            addChunk(terrain, chunk);
                         } catch (Exception e) {
                             e.printStackTrace();
-                            System.out.println(chunk);
                         } finally {
                             loadingChunks.remove(chunk);
+                        }
+                    });
+                } else if (loadedChunks.containsKey(chunk)) {
+                    executor.submit(() -> {
+                        try {
+                            float[][] terrain = generatedHeightmaps.get(chunk);
+
+                            if (terrain == null) {
+                                generateTerrain(chunk);
+                            }
+
+                            // Generate road if this parent chunk is on the road's path
+                            if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk && !loadingRoads.contains(chunk)) {
+                                loadingRoads.add(chunk);
+
+                                generateRoad(terrain, chunk);
+
+                                addChunk(terrain, chunk);
+                                loadingRoads.remove(chunk);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            loadingRoads.remove(chunk);
                         }
                     });
                 }
@@ -123,6 +136,21 @@ public class ChunkManager {
         });
     }
 
+    private void addChunk(float[][] terrain, ChunkCoord chunk) {
+        Mesh mesh = generator.generateChunkMesh(terrain);
+        Geometry chunkGeom = generator.createGeometry(chunk, mesh);
+
+        loadedChunks.put(chunk, chunkGeom);
+        loadingChunks.remove(chunk);
+
+        main.enqueue(() -> {
+            rootNode.attachChild(chunkGeom);
+            bulletAppState.getPhysicsSpace().add(
+                    chunkGeom.getControl(RigidBodyControl.class));
+
+        });
+    }
+
     private void generateTerrain(ChunkCoord chunk) throws IOException {
         loadingHeightmaps.add(chunk);
         float[][] terrain = generator.generateHeightMap(chunk);
@@ -135,20 +163,15 @@ public class ChunkManager {
         Integer startX;
         Integer startZ;
         if (road.verticalExitUp) {
-            System.out.println("upward exit");
-            startZ = CHUNK_SIZE - 1;
-            startX = road.lastXCoord;
-        } else if (road.verticalExitDown) {
-            System.out.println("downward exit");
             startZ = 0;
             startX = road.lastXCoord;
+        } else if (road.verticalExitDown) {
+            startZ = CHUNK_SIZE - 1;
+            startX = road.lastXCoord;
         } else {
-            System.out.println("normal exit");
             startZ = road.lastZCoord;
             startX = 0;
         }
-        System.out.println(startX);
-        System.out.println(startZ);
         List<jMonkeyEngine.Road.Node> pathPoints = road.getRoadPointsInChunk(terrain, startX,
                                                                              startZ, CHUNK_SIZE - 1,
                                                                              CHUNK_SIZE / 2);
