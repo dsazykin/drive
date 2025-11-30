@@ -11,6 +11,10 @@ public class RoadGenerator {
     public boolean verticalExitUp = false;
     public boolean verticalExitDown = false;
 
+    // Tuning constants
+    private static final float TURN_WEIGHT = 200f;   // penalty strength for turning
+    private static final float NO_UTURN_COS = -0.25f; // disallow turns sharper than ~104 degrees
+
     // Cache offsets per radius to avoid recomputation
     private final Map<Integer, List<int[]>> offsetCache = new HashMap<>();
 
@@ -34,8 +38,7 @@ public class RoadGenerator {
         });
     }
 
-    public List<Node> getRoadPointsInChunk(float[][] heightmap, int startX, int startY, int goalX,
-                                           int goalY) {
+    public List<Node> getRoadPointsInChunk(float[][] heightmap, int startX, int startY, int goalX, int goalY) {
         int rows = heightmap.length;
         int cols = heightmap[0].length;
 
@@ -55,7 +58,7 @@ public class RoadGenerator {
         boolean enteredFromBottom = (startY <= 0);
         final int MIN_PROGRESS = 30;
 
-        // Reuse offsets (no repeated printing)
+        // Ring step candidates (example radius)
         List<int[]> directions = generateOffsets(10);
 
         while (!openSet.isEmpty()) {
@@ -84,36 +87,54 @@ public class RoadGenerator {
             for (int[] dir : directions) {
                 int nx = current.x + dir[0];
                 int ny = current.y + dir[1];
-                if (nx < 0 || ny < 0 || nx >= rows || ny >= cols || visited[nx][ny])
-                    continue;
+                if (nx < 0 || ny < 0 || nx >= rows || ny >= cols || visited[nx][ny]) continue;
 
                 int dx = dir[0];
                 int dy = dir[1];
-                if (dx < 0)
-                    continue; // discourage backward X
+                if (dx < 0) continue; // discourage backward X progress
 
-                float dot = current.dxFromParent * dx + current.dyFromParent * dy;
-                float mag2 = dx * dx + dy * dy;
-                float cosAngle = dot / (current.dirMag * (float) Math.sqrt(mag2));
-                if (Double.isNaN(cosAngle))
-                    cosAngle = 1;
-                if (cosAngle <= 0)
-                    continue;
+                // Step length and normalized new direction
+                float stepLen = (float) Math.sqrt(dx * dx + dy * dy);
+                if (stepLen <= 1e-6f) continue;
+                float newDirX = dx / stepLen;
+                float newDirY = dy / stepLen;
 
+                // Previous normalized direction
+                float prevDirX, prevDirY;
+                if (current.dirMag <= 1e-6f) {
+                    // At the start, no penalty
+                    prevDirX = newDirX;
+                    prevDirY = newDirY;
+                } else {
+                    prevDirX = current.dxFromParent / current.dirMag;
+                    prevDirY = current.dyFromParent / current.dirMag;
+                }
+
+                // Cosine of turn angle, clamp for stability
+                float cos = prevDirX * newDirX + prevDirY * newDirY;
+                if (cos < -1f) cos = -1f; else if (cos > 1f) cos = 1f;
+
+                // Optional guard against hard U-turns
+                if (cos < NO_UTURN_COS) continue;
+
+                // Smooth turning penalty: ~0 for straight, grows with angle
+                // For small angles: (1 - cos) ~= 0.5 * angle^2
+                float turnPenalty = TURN_WEIGHT * (1f - cos) * stepLen;
+
+                // Terrain + distance + forward progress
                 float heightWeight = 100.0f * (rows * 2);
                 float heightDiff = Math.abs(heightmap[current.x][current.y] - heightmap[nx][ny]);
-                float distance = (float) Math.sqrt(mag2);
-                float xProgressBonus = dx > 0 ? -30f * dx : 0;
-                float baseCost = distance * 10f + xProgressBonus;
-                float moveCost = baseCost + (heightWeight * heightDiff);
+                float xProgressBonus = dx > 0 ? -30f * dx : 0f;
+                float baseCost = stepLen * 10f + xProgressBonus;
+
+                float moveCost = baseCost + turnPenalty + (heightWeight * heightDiff);
                 float tentativeG = current.gCost + moveCost;
 
                 float roadHeight = getRoadHeight(nx, ny, heightmap);
                 Node neighbor = nodeMap[nx][ny];
                 if (neighbor == null || tentativeG < neighbor.gCost) {
                     float h = heuristic(nx, ny, goalX, goalY);
-                    neighbor = new Node(nx, ny, roadHeight, tentativeG, tentativeG + h, current, dx,
-                                        dy);
+                    neighbor = new Node(nx, ny, roadHeight, tentativeG, tentativeG + h, current, dx, dy);
                     nodeMap[nx][ny] = neighbor;
                     openSet.add(neighbor);
                     visited[nx][ny] = true;
