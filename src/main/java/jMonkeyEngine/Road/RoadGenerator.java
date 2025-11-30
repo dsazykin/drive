@@ -124,10 +124,17 @@ public class RoadGenerator {
                 // Terrain + distance + forward progress
                 float heightWeight = 100.0f * (rows * 2);
                 float heightDiff = Math.abs(heightmap[current.x][current.y] - heightmap[nx][ny]);
+                float slopeAtNext = getSlopePenalty(nx, ny, heightmap);
+
+                // Combine both: height change over step + slope at destination
+                float SLOPE_WEIGHT = 50f * (rows * 2);
+                float terrainCost = (heightWeight * heightDiff) + (SLOPE_WEIGHT * slopeAtNext);
+
                 float xProgressBonus = dx > 0 ? -30f * dx : 0f;
                 float baseCost = stepLen * 10f + xProgressBonus;
 
-                float moveCost = baseCost + turnPenalty + (heightWeight * heightDiff);
+                float moveCost = baseCost + turnPenalty + terrainCost;
+
                 float tentativeG = current.gCost + moveCost;
 
                 float roadHeight = getRoadHeight(nx, ny, heightmap);
@@ -164,6 +171,31 @@ public class RoadGenerator {
             points++;
         }
         return sum / points;
+    }
+
+    private float getSlopePenalty(int x, int y, float[][] heightmap) {
+        int rows = heightmap.length;
+        int cols = heightmap[0].length;
+
+        float h = heightmap[x][y];
+        float dx = 0f, dz = 0f;
+        int count = 0;
+
+        // Central differences for gradient estimation
+        if (x > 0 && x < rows - 1) {
+            dx = (heightmap[x + 1][y] - heightmap[x - 1][y]) / 2f;
+            count++;
+        }
+        if (y > 0 && y < cols - 1) {
+            dz = (heightmap[x][y + 1] - heightmap[x][y - 1]) / 2f;
+            count++;
+        }
+
+        if (count == 0) return 0f;
+
+        // Slope magnitude (rise over run in grid units)
+        float slopeMag = (float) Math.sqrt(dx * dx + dz * dz);
+        return slopeMag;
     }
 
     private float heuristic(int x1, int y1, int x2, int y2) {
