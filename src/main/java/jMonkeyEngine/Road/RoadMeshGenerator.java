@@ -1,6 +1,8 @@
 package jMonkeyEngine.Road;
 
 import com.jme3.asset.AssetManager;
+import com.jme3.bullet.collision.shapes.MeshCollisionShape;
+import com.jme3.bullet.control.RigidBodyControl;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector2f;
@@ -19,7 +21,7 @@ public class RoadMeshGenerator {
     private final float SCALE;
     private final int MAX_HEIGHT;
     private final float ROAD_WIDTH = 6f;
-    private final float ROAD_THICKNESS = 0.5f;
+    private final float yOffset = 0.05f; // small visual offset above terrain
     private final AssetManager assetManager;
 
     public RoadMeshGenerator(AssetManager assetManager, float scale, int maxHeight) {
@@ -28,20 +30,12 @@ public class RoadMeshGenerator {
         this.MAX_HEIGHT = maxHeight;
     }
 
-    /**
-     * Generate a 3D road mesh from road points within a chunk.
-     */
     public Geometry generateRoadGeometry(List<Node> roadPoints, ChunkCoord chunk, float[][] heightmap) {
-        if (roadPoints == null || roadPoints.size() < 2) {
-            return null;
-        }
+        if (roadPoints == null || roadPoints.size() < 2) return null;
 
-        // Interpolate points for smooth curves
+        // Curved path in local chunk space (x,z in local units scaled by SCALE/16)
         List<Vector3f> smoothPath = interpolateRoadPath(roadPoints, heightmap);
-
-        if (smoothPath.size() < 2) {
-            return null;
-        }
+        if (smoothPath.size() < 2) return null;
 
         List<Vector3f> vertices = new ArrayList<>();
         List<Integer> indices = new ArrayList<>();
@@ -49,61 +43,53 @@ public class RoadMeshGenerator {
         List<Vector2f> uvs = new ArrayList<>();
 
         float halfWidth = ROAD_WIDTH / 2f;
+        float unit = (SCALE / 16f); // world units per heightmap cell
 
-        // Generate road segments from smoothed path
         for (int i = 0; i < smoothPath.size() - 1; i++) {
-            Vector3f current = smoothPath.get(i);
+            Vector3f current = smoothPath.get(i);     // local space (x,z in world units within chunk)
             Vector3f next = smoothPath.get(i + 1);
 
-            // Calculate direction vector
             float dx = next.x - current.x;
             float dz = next.z - current.z;
             float segLength = (float) Math.sqrt(dx * dx + dz * dz);
-
             if (segLength < 0.01f) continue;
 
             dx /= segLength;
             dz /= segLength;
 
-            // Perpendicular vector for width
             float px = -dz;
             float pz = dx;
 
-            // Heights are already in the interpolated points
-            float currentHeight = current.y + ROAD_THICKNESS;
-            float nextHeight = next.y + ROAD_THICKNESS;
+            // Left/right positions in local chunk space
+            float cxLx = current.x + px * halfWidth * unit;
+            float cxLz = current.z + pz * halfWidth * unit;
+            float cxRx = current.x - px * halfWidth * unit;
+            float cxRz = current.z - pz * halfWidth * unit;
 
-            // Create quad for this segment (top surface)
+            float nxLx = next.x + px * halfWidth * unit;
+            float nxLz = next.z + pz * halfWidth * unit;
+            float nxRx = next.x - px * halfWidth * unit;
+            float nxRz = next.z - pz * halfWidth * unit;
+
+            // Sample terrain heights at each vertex (local chunk space -> heightmap indices)
+            float h_cL = sampleHeightBilinear(heightmap, cxLx / unit, cxLz / unit) * MAX_HEIGHT + yOffset;
+            float h_cR = sampleHeightBilinear(heightmap, cxRx / unit, cxRz / unit) * MAX_HEIGHT + yOffset;
+            float h_nL = sampleHeightBilinear(heightmap, nxLx / unit, nxLz / unit) * MAX_HEIGHT + yOffset;
+            float h_nR = sampleHeightBilinear(heightmap, nxRx / unit, nxRz / unit) * MAX_HEIGHT + yOffset;
+
             int baseIndex = vertices.size();
 
-            // Current segment vertices (4 corners of the quad)
-            Vector3f v0 = new Vector3f(
-                current.x + px * halfWidth * (SCALE / 16),
-                currentHeight,
-                current.z + pz * halfWidth * (SCALE / 16)
-            );
-            Vector3f v1 = new Vector3f(
-                current.x - px * halfWidth * (SCALE / 16),
-                currentHeight,
-                current.z - pz * halfWidth * (SCALE / 16)
-            );
-            Vector3f v2 = new Vector3f(
-                next.x + px * halfWidth * (SCALE / 16),
-                nextHeight,
-                next.z + pz * halfWidth * (SCALE / 16)
-            );
-            Vector3f v3 = new Vector3f(
-                next.x - px * halfWidth * (SCALE / 16),
-                nextHeight,
-                next.z - pz * halfWidth * (SCALE / 16)
-            );
+            Vector3f v0 = new Vector3f(cxLx, h_cL, cxLz); // current left
+            Vector3f v1 = new Vector3f(cxRx, h_cR, cxRz); // current right
+            Vector3f v2 = new Vector3f(nxLx, h_nL, nxLz); // next left
+            Vector3f v3 = new Vector3f(nxRx, h_nR, nxRz); // next right
 
             vertices.add(v0);
             vertices.add(v1);
             vertices.add(v2);
             vertices.add(v3);
 
-            // Top surface triangles
+            // Indices for the quad strip (top surface)
             indices.add(baseIndex);
             indices.add(baseIndex + 2);
             indices.add(baseIndex + 1);
@@ -112,148 +98,130 @@ public class RoadMeshGenerator {
             indices.add(baseIndex + 2);
             indices.add(baseIndex + 3);
 
-            // Calculate normal (pointing up for top surface)
+            // Per-face normals (approximate upward)
             Vector3f edge1 = v1.subtract(v0);
             Vector3f edge2 = v2.subtract(v0);
             Vector3f normal = edge1.cross(edge2).normalizeLocal();
-
             normals.add(normal);
             normals.add(normal);
             normals.add(normal);
             normals.add(normal);
 
-            // UV coordinates for texture mapping
             float u = (float) i / (smoothPath.size() - 1);
             float uNext = (float) (i + 1) / (smoothPath.size() - 1);
-
             uvs.add(new Vector2f(u, 0));
             uvs.add(new Vector2f(u, 1));
             uvs.add(new Vector2f(uNext, 0));
             uvs.add(new Vector2f(uNext, 1));
         }
 
-        if (vertices.isEmpty()) {
-            return null;
-        }
+        if (vertices.isEmpty()) return null;
 
-        // Create mesh
         Mesh mesh = new Mesh();
-
-        Vector3f[] vertArray = vertices.toArray(new Vector3f[0]);
-        Vector3f[] normalArray = normals.toArray(new Vector3f[0]);
-        Vector2f[] uvArray = uvs.toArray(new Vector2f[0]);
-
+        mesh.setBuffer(VertexBuffer.Type.Position, 3, BufferUtils.createFloatBuffer(vertices.toArray(new Vector3f[0])));
+        mesh.setBuffer(VertexBuffer.Type.Normal, 3, BufferUtils.createFloatBuffer(normals.toArray(new Vector3f[0])));
+        mesh.setBuffer(VertexBuffer.Type.TexCoord, 2, BufferUtils.createFloatBuffer(uvs.toArray(new Vector2f[0])));
         int[] indexArray = new int[indices.size()];
-        for (int i = 0; i < indices.size(); i++) {
-            indexArray[i] = indices.get(i);
-        }
-
-        mesh.setBuffer(VertexBuffer.Type.Position, 3, BufferUtils.createFloatBuffer(vertArray));
-        mesh.setBuffer(VertexBuffer.Type.Normal, 3, BufferUtils.createFloatBuffer(normalArray));
-        mesh.setBuffer(VertexBuffer.Type.TexCoord, 2, BufferUtils.createFloatBuffer(uvArray));
+        for (int i = 0; i < indices.size(); i++) indexArray[i] = indices.get(i);
         mesh.setBuffer(VertexBuffer.Type.Index, 3, BufferUtils.createIntBuffer(indexArray));
-
         mesh.updateBound();
 
-        // Create geometry
         Geometry roadGeom = new Geometry("Road_" + chunk.x + "_" + chunk.z, mesh);
 
-        // Create material
         Material mat = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
-        mat.setColor("Diffuse", new ColorRGBA(0.3f, 0.3f, 0.3f, 1f)); // Dark gray road
+        mat.setColor("Diffuse", new ColorRGBA(0.3f, 0.3f, 0.3f, 1f));
         mat.setColor("Ambient", new ColorRGBA(0.3f, 0.3f, 0.3f, 1f));
         mat.setBoolean("UseMaterialColors", true);
-
         roadGeom.setMaterial(mat);
 
-        // Position relative to chunk
+        // Place mesh at chunk world origin; vertices are in local chunk space
         roadGeom.setLocalTranslation(
-            chunk.x * (199f) * (SCALE / 16),
-            0f,
-            chunk.z * (199f) * (SCALE / 16)
+                chunk.x * 199f * unit,
+                0f,
+                chunk.z * 199f * unit
         );
+
+        // Physics matches mesh shape (static)
+        MeshCollisionShape shape = new MeshCollisionShape(mesh);
+        RigidBodyControl rbc = new RigidBodyControl(shape, 0f);
+        roadGeom.addControl(rbc);
 
         return roadGeom;
     }
 
-    /**
-     * Sample height from heightmap with bounds checking.
-     */
     private float sampleHeight(float[][] heightmap, int x, int y) {
-        if (x < 0 || y < 0 || x >= heightmap.length || y >= heightmap[0].length) {
-            return 0;
-        }
-        float height = heightmap[x][y];
-        // Remove road marker if present
-        if (height > 1) {
-            height = height - (float) Math.floor(height);
-        }
-        return height;
+        if (x < 0 || y < 0 || x >= heightmap.length || y >= heightmap[0].length) return 0f;
+        float h = heightmap[x][y];
+        if (h > 1f) h = h - (float) Math.floor(h); // strip road marker, keep base height
+        return h;
     }
 
-    /**
-     * Interpolate road path using Catmull-Rom splines for smooth curves.
-     */
+    // Bilinear sampling in heightmap index space (local chunk coordinates)
+    private float sampleHeightBilinear(float[][] heightmap, float lx, float lz) {
+        int maxX = heightmap.length - 1;
+        int maxZ = heightmap[0].length - 1;
+
+        int x0 = clamp((int) Math.floor(lx), 0, maxX);
+        int z0 = clamp((int) Math.floor(lz), 0, maxZ);
+        int x1 = clamp(x0 + 1, 0, maxX);
+        int z1 = clamp(z0 + 1, 0, maxZ);
+
+        float tx = Math.max(0f, Math.min(1f, lx - x0));
+        float tz = Math.max(0f, Math.min(1f, lz - z0));
+
+        float h00 = sampleHeight(heightmap, x0, z0);
+        float h10 = sampleHeight(heightmap, x1, z0);
+        float h01 = sampleHeight(heightmap, x0, z1);
+        float h11 = sampleHeight(heightmap, x1, z1);
+
+        float h0 = h00 + tx * (h10 - h00);
+        float h1 = h01 + tx * (h11 - h01);
+        return h0 + tz * (h1 - h0);
+    }
+
+    private int clamp(int v, int min, int max) {
+        return Math.max(min, Math.min(max, v));
+    }
+
     private List<Vector3f> interpolateRoadPath(List<Node> roadPoints, float[][] heightmap) {
         List<Vector3f> smoothPath = new ArrayList<>();
+        if (roadPoints.size() < 2) return smoothPath;
 
-        if (roadPoints.size() < 2) {
-            return smoothPath;
-        }
-
-        // Convert road points to world space positions
+        float unit = (SCALE / 16f);
         List<Vector3f> controlPoints = new ArrayList<>();
         for (Node node : roadPoints) {
-            float x = node.x * (SCALE / 16);
-            float z = node.y * (SCALE / 16);
+            float x = node.x * unit;
+            float z = node.y * unit;
             float height = sampleHeight(heightmap, node.x, node.y) * MAX_HEIGHT;
             controlPoints.add(new Vector3f(x, height, z));
         }
 
-        // Number of interpolated points between each pair of control points
         int subdivisions = 8;
-
-        // Generate smooth curve using Catmull-Rom spline
         for (int i = 0; i < controlPoints.size() - 1; i++) {
-            // Get the four control points for this segment
             Vector3f p0 = (i > 0) ? controlPoints.get(i - 1) : controlPoints.get(i);
             Vector3f p1 = controlPoints.get(i);
             Vector3f p2 = controlPoints.get(i + 1);
             Vector3f p3 = (i < controlPoints.size() - 2) ? controlPoints.get(i + 2) : controlPoints.get(i + 1);
-
-            // Interpolate between p1 and p2
             for (int j = 0; j < subdivisions; j++) {
                 float t = (float) j / subdivisions;
-                Vector3f point = catmullRomInterpolate(p0, p1, p2, p3, t);
-                smoothPath.add(point);
+                smoothPath.add(catmullRomInterpolate(p0, p1, p2, p3, t));
             }
         }
-
-        // Add the final point
         smoothPath.add(controlPoints.get(controlPoints.size() - 1));
-
         return smoothPath;
     }
 
-    /**
-     * Catmull-Rom spline interpolation.
-     * Returns a point on the curve between p1 and p2, given parameter t (0 to 1).
-     */
     private Vector3f catmullRomInterpolate(Vector3f p0, Vector3f p1, Vector3f p2, Vector3f p3, float t) {
         float t2 = t * t;
         float t3 = t2 * t;
-
-        // Catmull-Rom matrix coefficients
-        float coef0 = -0.5f * t3 + t2 - 0.5f * t;
-        float coef1 = 1.5f * t3 - 2.5f * t2 + 1.0f;
-        float coef2 = -1.5f * t3 + 2.0f * t2 + 0.5f * t;
-        float coef3 = 0.5f * t3 - 0.5f * t2;
-
-        float x = coef0 * p0.x + coef1 * p1.x + coef2 * p2.x + coef3 * p3.x;
-        float y = coef0 * p0.y + coef1 * p1.y + coef2 * p2.y + coef3 * p3.y;
-        float z = coef0 * p0.z + coef1 * p1.z + coef2 * p2.z + coef3 * p3.z;
-
-        return new Vector3f(x, y, z);
+        float c0 = -0.5f * t3 + t2 - 0.5f * t;
+        float c1 =  1.5f * t3 - 2.5f * t2 + 1.0f;
+        float c2 = -1.5f * t3 + 2.0f * t2 + 0.5f * t;
+        float c3 =  0.5f * t3 - 0.5f * t2;
+        return new Vector3f(
+                c0 * p0.x + c1 * p1.x + c2 * p2.x + c3 * p3.x,
+                c0 * p0.y + c1 * p1.y + c2 * p2.y + c3 * p3.y,
+                c0 * p0.z + c1 * p1.z + c2 * p2.z + c3 * p3.z
+        );
     }
 }
-
