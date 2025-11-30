@@ -17,6 +17,7 @@ import com.jme3.util.BufferUtils;
 import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
 import jMonkeyEngine.Road.RoadGenerator;
+import jMonkeyEngine.Road.RoadMeshGenerator;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,7 @@ public class TerrainGenerator{
     private final HeightMapGenerator heightMap;
     private ChunkManager manager;
     private final RoadGenerator road;
+    private final RoadMeshGenerator roadMeshGenerator;
     private final SimpleApplication main;
     private final ExecutorService executor;
 
@@ -63,6 +65,7 @@ public class TerrainGenerator{
         this.SEED = seed;
         MAX_HEIGHT = maxHeight;
         this.heightMap = new HeightMapGenerator(SEED, CHUNK_SIZE, SCALE);
+        this.roadMeshGenerator = new RoadMeshGenerator(assetManager, SCALE, maxHeight);
     }
 
     public void setChunkManager(ChunkManager manager) {
@@ -75,6 +78,10 @@ public class TerrainGenerator{
 
     public void updateHeightMap(float[][] terrain, List<jMonkeyEngine.Road.Node> pathPoints, ChunkCoord chunk) {
         heightMap.applyRoadFlattening(terrain, pathPoints, chunk);
+    }
+
+    public Geometry generateRoadGeometry(List<jMonkeyEngine.Road.Node> pathPoints, ChunkCoord chunk, float[][] heightmap) {
+        return roadMeshGenerator.generateRoadGeometry(pathPoints, chunk, heightmap);
     }
 
     public Mesh generateChunkMesh(float[][] terrain){

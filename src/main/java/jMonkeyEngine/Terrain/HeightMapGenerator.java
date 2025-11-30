@@ -63,22 +63,67 @@ public class HeightMapGenerator {
         float[][] targetHeights = new float[heightmap.length][heightmap[0].length];
         boolean[][] hasTarget = new boolean[heightmap.length][heightmap[0].length];
 
+        // Interpolate points for smooth curves
+        int subdivisions = 8; // Points between each control point
+
         for (int i = 0; i < roadPath.size() - 1; i++) {
-            Node a = roadPath.get(i);
-            Node b = roadPath.get(i + 1);
+            // Get control points for Catmull-Rom spline
+            Node p0 = (i > 0) ? roadPath.get(i - 1) : roadPath.get(i);
+            Node p1 = roadPath.get(i);
+            Node p2 = roadPath.get(i + 1);
+            Node p3 = (i < roadPath.size() - 2) ? roadPath.get(i + 2) : roadPath.get(i + 1);
 
-            float dx = b.x - a.x;
-            float dz = b.y - a.y;
-            float segLength = (float) Math.sqrt(dx * dx + dz * dz);
-            dx /= segLength;
-            dz /= segLength;
+            // Interpolate between p1 and p2
+            for (int j = 0; j < subdivisions; j++) {
+                float t = (float) j / subdivisions;
 
-            float px = -dz;
-            float pz = dx;
+                // Catmull-Rom interpolation
+                float t2 = t * t;
+                float t3 = t2 * t;
 
-            for (float t = 0; t <= segLength; t += 0.5f) {
-                float cx = a.x + dx * t;
-                float cz = a.y + dz * t;
+                float coef0 = -0.5f * t3 + t2 - 0.5f * t;
+                float coef1 = 1.5f * t3 - 2.5f * t2 + 1.0f;
+                float coef2 = -1.5f * t3 + 2.0f * t2 + 0.5f * t;
+                float coef3 = 0.5f * t3 - 0.5f * t2;
+
+                float cx = coef0 * p0.x + coef1 * p1.x + coef2 * p2.x + coef3 * p3.x;
+                float cz = coef0 * p0.y + coef1 * p1.y + coef2 * p2.y + coef3 * p3.y;
+
+                // Calculate tangent direction for perpendicular
+                float dx = 0, dz = 0;
+                if (j == 0 && i > 0) {
+                    dx = p2.x - p1.x;
+                    dz = p2.y - p1.y;
+                } else if (j < subdivisions - 1) {
+                    // Next point on curve
+                    float tNext = (float)(j + 1) / subdivisions;
+                    float t2Next = tNext * tNext;
+                    float t3Next = t2Next * tNext;
+
+                    float coef0Next = -0.5f * t3Next + t2Next - 0.5f * tNext;
+                    float coef1Next = 1.5f * t3Next - 2.5f * t2Next + 1.0f;
+                    float coef2Next = -1.5f * t3Next + 2.0f * t2Next + 0.5f * tNext;
+                    float coef3Next = 0.5f * t3Next - 0.5f * t2Next;
+
+                    float cxNext = coef0Next * p0.x + coef1Next * p1.x + coef2Next * p2.x + coef3Next * p3.x;
+                    float czNext = coef0Next * p0.y + coef1Next * p1.y + coef2Next * p2.y + coef3Next * p3.y;
+
+                    dx = cxNext - cx;
+                    dz = czNext - cz;
+                } else {
+                    dx = p2.x - p1.x;
+                    dz = p2.y - p1.y;
+                }
+
+                float segLength = (float) Math.sqrt(dx * dx + dz * dz);
+                if (segLength > 0.01f) {
+                    dx /= segLength;
+                    dz /= segLength;
+                }
+
+                float px = -dz;
+                float pz = dx;
+
 
                 float lx = cx + px * halfWidth;
                 float lz = cz + pz * halfWidth;
@@ -90,7 +135,7 @@ public class HeightMapGenerator {
                 if (leftH != 0) count++;
                 float rightH = sampleHeight(heightmap, rx, rz);
                 if (rightH != 0) count++;
-                float currHeight = (leftH + rightH) / count + 2;
+                float currHeight = (leftH + rightH) / count;
 
                 if (prevHeight != Float.MAX_VALUE) {
                     currHeight = prevHeight * 0.98f + currHeight * 0.02f;
@@ -159,7 +204,7 @@ public class HeightMapGenerator {
         for (int x = 0; x < heightmap.length; x++) {
             for (int z = 0; z < heightmap[0].length; z++) {
                 if (hasTarget[x][z]) {
-                    float roadH = targetHeights[x][z] - 2;
+                    float roadH = targetHeights[x][z];
 
                     for (int dx = -featherRadius; dx <= featherRadius; dx++) {
                         for (int dz = -featherRadius; dz <= featherRadius; dz++) {

@@ -30,6 +30,7 @@ public class ChunkManager {
     Set<ChunkCoord> loadingHeightmaps = ConcurrentHashMap.newKeySet();
     Set<ChunkCoord> loadingRoads = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<ChunkCoord, Geometry> loadedChunks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ChunkCoord, Geometry> loadedRoads = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, Geometry> generatedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, float[][]> generatedHeightmaps = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>> generatedRoads =
@@ -109,14 +110,23 @@ public class ChunkManager {
                                 loadingRoads.add(chunk);
 
                                 Geometry geometry = generatedChunks.get(chunk);
+                                Geometry oldRoadGeom = loadedRoads.get(chunk);
+
                                 main.enqueue(() -> {
                                     geometry.removeFromParent();
                                     bulletAppState.getPhysicsSpace().remove(geometry);
 
+                                    // Remove old road physics
+                                    if (oldRoadGeom != null) {
+                                        RigidBodyControl oldRoadPhysics = oldRoadGeom.getControl(RigidBodyControl.class);
+                                        if (oldRoadPhysics != null) {
+                                            bulletAppState.getPhysicsSpace().remove(oldRoadPhysics);
+                                        }
+                                        oldRoadGeom.removeFromParent();
+                                    }
                                 });
 
                                 generateRoad(terrain, chunk);
-
                                 addChunk(terrain, chunk);
                                 loadingRoads.remove(chunk);
                             }
@@ -137,6 +147,16 @@ public class ChunkManager {
                 chunk.removeFromParent();
                 bulletAppState.getPhysicsSpace().remove(chunk);
 
+                // Also remove road geometry and physics if it exists
+                Geometry roadGeom = loadedRoads.remove(entry.getKey());
+                if (roadGeom != null) {
+                    RigidBodyControl roadPhysics = roadGeom.getControl(RigidBodyControl.class);
+                    if (roadPhysics != null) {
+                        bulletAppState.getPhysicsSpace().remove(roadPhysics);
+                    }
+                    roadGeom.removeFromParent();
+                }
+
                 return true;
             }
             return false;
@@ -155,6 +175,20 @@ public class ChunkManager {
             bulletAppState.getPhysicsSpace().add(
                     chunkGeom.getControl(RigidBodyControl.class));
 
+            // Add road geometry if it exists for this chunk
+            List<jMonkeyEngine.Road.Node> roadPoints = generatedRoads.get(chunk);
+            if (roadPoints != null && !roadPoints.isEmpty()) {
+                Geometry roadGeom = generator.generateRoadGeometry(roadPoints, chunk, terrain);
+                if (roadGeom != null) {
+                    // Add physics to the road
+                    RigidBodyControl roadPhysics = new RigidBodyControl(0f); // 0f = static (immovable)
+                    roadGeom.addControl(roadPhysics);
+
+                    loadedRoads.put(chunk, roadGeom);
+                    rootNode.attachChild(roadGeom);
+                    bulletAppState.getPhysicsSpace().add(roadPhysics);
+                }
+            }
         });
     }
 
@@ -189,7 +223,7 @@ public class ChunkManager {
 
     public float getHeight(int MAX_HEIGHT, int x, int z, ChunkCoord chunk) {
         float[][] heightMap = generatedHeightmaps.get(chunk);
-        return (heightMap[x][z] - 2) * MAX_HEIGHT;
+        return (heightMap[x][z]) * MAX_HEIGHT;
     }
 
     public Vector3f getCamDirection(float height) {
