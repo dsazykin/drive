@@ -42,6 +42,7 @@ public class TerrainGenerator{
     private final float SCALE;
     private final Long SEED;
     private final int MAX_HEIGHT;
+    private final float ROAD_WIDTH;
 
     private List<Future<?>> chunkTasks;
 
@@ -53,7 +54,7 @@ public class TerrainGenerator{
     public TerrainGenerator(BulletAppState bulletAppState,
                             Node rootNode, AssetManager assetManager, RoadGenerator road, SimpleApplication main,
                             ExecutorService executor, int chunkSize, float SCALE, Long seed,
-                            int maxHeight) {
+                            int maxHeight, float roadWidth) {
         this.bulletAppState = bulletAppState;
         this.rootNode = rootNode;
         this.assetManager = assetManager;
@@ -64,8 +65,9 @@ public class TerrainGenerator{
         this.SCALE = SCALE;
         this.SEED = seed;
         MAX_HEIGHT = maxHeight;
-        this.heightMap = new HeightMapGenerator(SEED, CHUNK_SIZE, SCALE);
-        this.roadMeshGenerator = new RoadMeshGenerator(assetManager, SCALE, maxHeight);
+        this.heightMap = new HeightMapGenerator(SEED, CHUNK_SIZE, SCALE, roadWidth);
+        ROAD_WIDTH = roadWidth;
+        this.roadMeshGenerator = new RoadMeshGenerator(assetManager, SCALE, CHUNK_SIZE, MAX_HEIGHT, ROAD_WIDTH);
     }
 
     public void setChunkManager(ChunkManager manager) {

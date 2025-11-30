@@ -85,6 +85,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
     private final int CHUNK_SIZE = 200;
     private final float SCALE = 40f;
     private long SEED;
+    private final float ROAD_WIDTH = 6f;
 
     @Override
     protected void initialize(Application app) {
@@ -126,7 +127,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
         updateLoadingStage("Initializing terrain generator...");
         road = new RoadGenerator();
         generator = new TerrainGenerator(bulletAppState, gameplayRoot, assetManager, road, sapp, executor,
-                                         CHUNK_SIZE, SCALE, SEED, 200);
+                                         CHUNK_SIZE, SCALE, SEED, 200, ROAD_WIDTH);
         this.manager =
                 new ChunkManager(bulletAppState, gameplayRoot, road, generator, sapp, executor,
                                  CHUNK_SIZE, SCALE, 2);

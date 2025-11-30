@@ -66,6 +66,7 @@ public class MainMenuState extends BaseAppState {
     private final int CHUNK_SIZE = 200;
     private final float SCALE = 40f;
     private long SEED = 12345L; // Fixed seed for consistent menu terrain
+    private final float ROAD_WIDTH = 6f;
 
     jMonkeyEngine.Entities.Cars.Car car;
 
@@ -126,7 +127,7 @@ public class MainMenuState extends BaseAppState {
 
         road = new RoadGenerator();
         generator = new TerrainGenerator(bulletAppState, backgroundNode, assetManager, road, sapp, executor,
-                                         CHUNK_SIZE, SCALE, SEED, 200);
+                                         CHUNK_SIZE, SCALE, SEED, 200, ROAD_WIDTH);
         manager = new ChunkManager(bulletAppState, backgroundNode, road, generator, sapp, executor,
                                    CHUNK_SIZE, SCALE, 1);
         generator.setChunkManager(manager);

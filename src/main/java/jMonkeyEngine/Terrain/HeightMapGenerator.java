@@ -16,13 +16,15 @@ public class HeightMapGenerator {
     private final long SEED;
     private final int CHUNK_SIZE;
     private final double SCALE;
+    private final float ROAD_WIDTH;
 
     float prevHeight = Float.MAX_VALUE;
 
-    public HeightMapGenerator(long seed, int chunkSize, double scale) {
+    public HeightMapGenerator(long seed, int chunkSize, double scale, float roadWidth) {
         SEED = seed;
         CHUNK_SIZE = chunkSize;
         SCALE = scale;
+        ROAD_WIDTH = roadWidth;
     }
 
     public float[][] generateHeightmap(int chunkX, int chunkZ) {
@@ -57,8 +59,7 @@ public class HeightMapGenerator {
     }
 
     public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath, ChunkCoord chunk) {
-        float roadWidth = 6f;
-        float halfWidth = roadWidth / 2f;
+        float halfWidth = ROAD_WIDTH / 2f;
 
         float[][] targetHeights = new float[heightmap.length][heightmap[0].length];
         boolean[][] hasTarget = new boolean[heightmap.length][heightmap[0].length];
@@ -289,7 +290,7 @@ public class HeightMapGenerator {
         Long seed = 946496062586794636L;
         int chunkSize = 200;
         float scale = 40;
-        HeightMapGenerator generator = new HeightMapGenerator(seed, chunkSize, scale);
+        HeightMapGenerator generator = new HeightMapGenerator(seed, chunkSize, scale, 6f);
         RoadGenerator road = new RoadGenerator();
 
 //        float[][] heightmap = generator.generateHeightmap(0, 0);

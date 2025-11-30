@@ -19,15 +19,19 @@ import java.util.List;
 public class RoadMeshGenerator {
 
     private final float SCALE;
+    private final int CHUNK_SIZE;
     private final int MAX_HEIGHT;
-    private final float ROAD_WIDTH = 6f;
+    private final float ROAD_WIDTH;
     private final float yOffset = 0.05f; // small visual offset above terrain
     private final AssetManager assetManager;
 
-    public RoadMeshGenerator(AssetManager assetManager, float scale, int maxHeight) {
+    public RoadMeshGenerator(AssetManager assetManager, float scale, int chunkSize, int maxHeight,
+                             float roadWidth) {
         this.assetManager = assetManager;
         this.SCALE = scale;
+        CHUNK_SIZE = chunkSize;
         this.MAX_HEIGHT = maxHeight;
+        ROAD_WIDTH = roadWidth;
     }
 
     public Geometry generateRoadGeometry(List<Node> roadPoints, ChunkCoord chunk, float[][] heightmap) {
@@ -136,9 +140,9 @@ public class RoadMeshGenerator {
 
         // Place mesh at chunk world origin; vertices are in local chunk space
         roadGeom.setLocalTranslation(
-                chunk.x * 199f * unit,
+                chunk.x * (CHUNK_SIZE - 1) * unit,
                 0f,
-                chunk.z * 199f * unit
+                chunk.z * (CHUNK_SIZE - 1) * unit
         );
 
         // Physics matches mesh shape (static)
@@ -150,7 +154,7 @@ public class RoadMeshGenerator {
     }
 
     private float sampleHeight(float[][] heightmap, int x, int y) {
-        if (x < 0 || y < 0 || x >= heightmap.length || y >= heightmap[0].length) return 0f;
+        if (x < 0 || y < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE) return 0f;
         float h = heightmap[x][y];
         if (h > 1f) h = h - (float) Math.floor(h); // strip road marker, keep base height
         return h;
@@ -158,8 +162,8 @@ public class RoadMeshGenerator {
 
     // Bilinear sampling in heightmap index space (local chunk coordinates)
     private float sampleHeightBilinear(float[][] heightmap, float lx, float lz) {
-        int maxX = heightmap.length - 1;
-        int maxZ = heightmap[0].length - 1;
+        int maxX = CHUNK_SIZE - 1;
+        int maxZ = CHUNK_SIZE - 1;
 
         int x0 = clamp((int) Math.floor(lx), 0, maxX);
         int z0 = clamp((int) Math.floor(lz), 0, maxZ);
