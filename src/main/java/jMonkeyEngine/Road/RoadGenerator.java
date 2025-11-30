@@ -11,21 +11,31 @@ public class RoadGenerator {
     public boolean verticalExitUp = false;
     public boolean verticalExitDown = false;
 
+    // Cache offsets per radius to avoid recomputation
+    private final Map<Integer, List<int[]>> offsetCache = new HashMap<>();
+
     private List<int[]> generateOffsets(int radius) {
-        List<int[]> offsets = new ArrayList<>();
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -radius; dy <= radius; dy++) {
-                if (dx == 0 && dy == 0) continue;
-                double dist = Math.sqrt(dx * dx + dy * dy);
-                if (Math.abs(dist - radius) < 0.5) {
-                    offsets.add(new int[]{dx, dy});
+        return offsetCache.computeIfAbsent(radius, r -> {
+            List<int[]> offsets = new ArrayList<>();
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dy = -r; dy <= r; dy++) {
+                    if (dx == 0 && dy == 0)
+                        continue;
+                    double dist = Math.sqrt(dx * dx + dy * dy);
+                    if (Math.abs(dist - r) < 0.5) {
+                        offsets.add(new int[]{dx, dy});
+                    }
                 }
             }
-        }
-        return offsets;
+            for (int[] offset : offsets) {
+                System.out.println(Arrays.toString(offset));
+            }
+            return Collections.unmodifiableList(offsets);
+        });
     }
 
-    public List<Node> getRoadPointsInChunk(float[][] heightmap, int startX, int startY, int goalX, int goalY) {
+    public List<Node> getRoadPointsInChunk(float[][] heightmap, int startX, int startY, int goalX,
+                                           int goalY) {
         int rows = heightmap.length;
         int cols = heightmap[0].length;
 
@@ -36,33 +46,28 @@ public class RoadGenerator {
         boolean[][] visited = new boolean[rows][cols];
         Node[][] nodeMap = new Node[rows][cols];
 
-        Node start = new Node(startX, startY, getRoadHeight(startX, startY, heightmap), 0, heuristic(startX, startY, goalX, goalY),null);
+        Node start = new Node(startX, startY, getRoadHeight(startX, startY, heightmap), 0,
+                              heuristic(startX, startY, goalX, goalY), null);
         openSet.add(start);
         nodeMap[startX][startY] = start;
 
-        // Determine entry boundary
         boolean enteredFromTop = (startY >= cols - 1);
         boolean enteredFromBottom = (startY <= 0);
+        final int MIN_PROGRESS = 30;
 
-        // Minimum distance to travel before allowing exit through entry boundary
-        final int MIN_PROGRESS = 30; // Adjust this value as needed
+        // Reuse offsets (no repeated printing)
+        List<int[]> directions = generateOffsets(10);
 
         while (!openSet.isEmpty()) {
             Node current = openSet.poll();
 
-            // Primary goal: reach the far X boundary (main direction)
             if (current.x >= goalX) {
                 return reconstructPath(current);
             }
 
-            // Calculate how far we've traveled into the chunk
             int distanceFromStart = Math.abs(current.y - startY);
-
-            // Allow exit through Z-boundaries
             if (current.parent != null) {
-                // Prevent immediate exit through entry boundary (unless we've traveled far enough)
                 boolean canExitThroughEntry = distanceFromStart >= MIN_PROGRESS;
-
                 if (current.y <= 0) {
                     if (!enteredFromBottom || canExitThroughEntry) {
                         verticalExitDown = true;
@@ -76,92 +81,67 @@ public class RoadGenerator {
                 }
             }
 
-            //visited[current.x][current.y] = true;
-
-            List<int[]> directions = generateOffsets(3);
             for (int[] dir : directions) {
                 int nx = current.x + dir[0];
                 int ny = current.y + dir[1];
+                if (nx < 0 || ny < 0 || nx >= rows || ny >= cols || visited[nx][ny])
+                    continue;
 
-                if (nx >= 0 && ny >= 0 && nx < rows && ny < cols && !visited[nx][ny]) {
-                    int dx = dir[0];
-                    int dy = dir[1];
+                int dx = dir[0];
+                int dy = dir[1];
+                if (dx < 0)
+                    continue; // discourage backward X
 
-                    // Discourage backward movement in X (we want to progress forward)
-                    if (dx < 0) continue;
+                float dot = current.dxFromParent * dx + current.dyFromParent * dy;
+                float mag2 = dx * dx + dy * dy;
+                float cosAngle = dot / (current.dirMag * (float) Math.sqrt(mag2));
+                if (Double.isNaN(cosAngle))
+                    cosAngle = 1;
+                if (cosAngle <= 0)
+                    continue;
 
-                    float dot = current.dxFromParent * dx + current.dyFromParent * dy;
-                    float mag2 = dx * dx + dy * dy;
+                float heightWeight = 100.0f * (rows * 2);
+                float heightDiff = Math.abs(heightmap[current.x][current.y] - heightmap[nx][ny]);
+                float distance = (float) Math.sqrt(mag2);
+                float xProgressBonus = dx > 0 ? -30f * dx : 0;
+                float baseCost = distance * 10f + xProgressBonus;
+                float moveCost = baseCost + (heightWeight * heightDiff);
+                float tentativeG = current.gCost + moveCost;
 
-                    float cosAngle = dot / (current.dirMag * (float) Math.sqrt(mag2));
-
-                    if (Double.isNaN(cosAngle)) {
-                        cosAngle = 1;
-                    }
-
-                    if (cosAngle > 0) {
-                        float heightWeight = 100.0f * (rows * 2);
-
-                        float heightDiff = Math.abs(heightmap[current.x][current.y] - heightmap[nx][ny]);
-
-                        float distance = (float) Math.sqrt(dx * dx + dy * dy);
-
-                        // Add bonus for X-progression (negative cost = preferred)
-                        // This encourages the road to move along X-axis
-                        float xProgressBonus = dx > 0 ? -30f * dx : 0;
-                        float baseCost = distance * 10f + xProgressBonus;
-
-                        float moveCost = baseCost + (heightWeight * heightDiff);
-
-//                        float angleCos = (mag1 == 0 || mag2 == 0) ? 1 : dot / (mag1 * mag2);
-//                        float anglePenalty = (1 - angleCos) * -10; // more penalty for sharper turns
-
-                        float tentativeG = current.gCost + moveCost;
-
-                        float roadHeight = getRoadHeight(nx, ny, heightmap);
-
-                        Node neighbor = nodeMap[nx][ny];
-                        if (neighbor == null || tentativeG < neighbor.gCost) {
-                            float h = heuristic(nx, ny, goalX, goalY);
-                            neighbor = new Node(nx, ny, roadHeight, tentativeG, tentativeG + h, current, dx, dy);
-                            nodeMap[nx][ny] = neighbor;
-                            openSet.add(neighbor);
-                            visited[nx][ny] = true; // Mark as visited when adding to queue
-                        }
-                    }
+                float roadHeight = getRoadHeight(nx, ny, heightmap);
+                Node neighbor = nodeMap[nx][ny];
+                if (neighbor == null || tentativeG < neighbor.gCost) {
+                    float h = heuristic(nx, ny, goalX, goalY);
+                    neighbor = new Node(nx, ny, roadHeight, tentativeG, tentativeG + h, current, dx,
+                                        dy);
+                    nodeMap[nx][ny] = neighbor;
+                    openSet.add(neighbor);
+                    visited[nx][ny] = true;
                 }
             }
         }
-
-        return Collections.emptyList(); // No path found
+        return Collections.emptyList();
     }
 
     private float getRoadHeight(int x, int y, float[][] terrain) {
-        float points = 1;
-        float sum = 0;
-
-        sum += terrain[x][y];
-
+        float sum = terrain[x][y];
+        int points = 1;
         if (x + 1 < terrain.length) {
             sum += terrain[x + 1][y];
-            points += 1;
+            points++;
         }
-
         if (x - 1 >= 0) {
             sum += terrain[x - 1][y];
-            points += 1;
+            points++;
         }
-
         if (y + 1 < terrain[0].length) {
             sum += terrain[x][y + 1];
-            points += 1;
+            points++;
         }
-
         if (y - 1 >= 0) {
             sum += terrain[x][y - 1];
-            points += 1;
+            points++;
         }
-
         return sum / points;
     }
 
@@ -180,18 +160,11 @@ public class RoadGenerator {
             currentXChunk++;
             lastZCoord = end.y;
         }
-
-        // Check if the road crossed into a different Z-chunk
-        // Assuming PARENT_SIZE is accessible or passed in, we need to detect boundary crossing
-        // If end.y is near 0, we entered from the south (previous Z-chunk was currentZChunk - 1)
-        // If end.y is near PARENT_SIZE-1, we're exiting to the north (next Z-chunk will be currentZChunk + 1)
-        // For now, we'll update this based on where we exited
-
         List<Node> path = new ArrayList<>();
-        Node current = end;
-        while (current != null) {
-            path.add(current);
-            current = current.parent;
+        Node cur = end;
+        while (cur != null) {
+            path.add(cur);
+            cur = cur.parent;
         }
         Collections.reverse(path);
         return path;

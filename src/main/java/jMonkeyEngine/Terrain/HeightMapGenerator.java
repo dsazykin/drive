@@ -342,7 +342,7 @@ public class HeightMapGenerator {
         int count = 0;
         int x = 0;
         int z = 0;
-        while (count < 5) {
+        while (count < 1) {
             ChunkCoord chunk = new ChunkCoord(x, z);
             System.out.println("next chunk: " + chunk.x + ", " + chunk.z);
             float[][] heightmap = generator.generateHeightmap(chunk.x, chunk.z);
