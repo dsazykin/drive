@@ -108,6 +108,13 @@ public class ChunkManager {
                             if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk && !loadingRoads.contains(chunk)) {
                                 loadingRoads.add(chunk);
 
+                                Geometry geometry = generatedChunks.get(chunk);
+                                main.enqueue(() -> {
+                                    geometry.removeFromParent();
+                                    bulletAppState.getPhysicsSpace().remove(geometry);
+
+                                });
+
                                 generateRoad(terrain, chunk);
 
                                 addChunk(terrain, chunk);
