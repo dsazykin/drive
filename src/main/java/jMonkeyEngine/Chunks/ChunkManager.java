@@ -74,58 +74,20 @@ public class ChunkManager {
                     executor.submit(() -> {
                         try {
                             if (!generatedHeightmaps.containsKey(chunk) && !loadingHeightmaps.contains(chunk)) {
-                                loadingHeightmaps.add(chunk);
-                                float[][] terrain = generator.generateHeightMap(chunk);
+                                generateTerrain(chunk);
+                            }
+                            float[][] terrain = generatedHeightmaps.get(chunk);
 
-                                // Generate road if this parent chunk is on the road's path
-                                // Road progresses along X-axis but can move between Z-chunks
-                                if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk) {
-                                    int startZ = road.lastZCoord;
-
-                                    // Check if we're entering from a previous Z-chunk
-                                    ChunkCoord prevZChunk = new ChunkCoord(chunk.x, chunk.z - 1);
-                                    ChunkCoord nextZChunk = new ChunkCoord(chunk.x, chunk.z + 1);
-
-                                    // If previous Z-chunk exists and has a road, we're entering from south
-                                    if (generatedRoads.containsKey(prevZChunk)) {
-                                        List<jMonkeyEngine.Road.Node> prevRoad = generatedRoads.get(prevZChunk);
-                                        if (!prevRoad.isEmpty()) {
-                                            jMonkeyEngine.Road.Node lastNode = prevRoad.get(prevRoad.size() - 1);
-                                            // Road is crossing from previous Z-chunk, start at bottom with same Z-coord
-                                            startZ = 0;
-                                        }
-                                    } else if (generatedRoads.containsKey(nextZChunk)) {
-                                        // Coming back from next Z-chunk (edge case, but handle it)
-                                        List<jMonkeyEngine.Road.Node> nextRoad = generatedRoads.get(nextZChunk);
-                                        if (!nextRoad.isEmpty()) {
-                                            jMonkeyEngine.Road.Node firstNode = nextRoad.get(0);
-                                            startZ = CHUNK_SIZE - 1;
-                                        }
-                                    }
-
-                                    List<jMonkeyEngine.Road.Node> pathPoints =
-                                            road.getRoadPointsInChunk(terrain, 0, startZ,
-                                                                      CHUNK_SIZE - 1,
-                                                                      CHUNK_SIZE / 2);
-                                    generator.updateHeightMap(terrain, pathPoints, chunk);
-                                    generatedRoads.put(chunk, pathPoints);
-
-                                    // Update Z-chunk position if road crossed a Z boundary
-                                    jMonkeyEngine.Road.Node lastNode = pathPoints.get(pathPoints.size() - 1);
-                                    if (lastNode.y >= CHUNK_SIZE - 1) {
-                                        // Road exited through north boundary, move to next Z-chunk
-                                        road.currentZChunk += 1;
-                                    } else if (lastNode.y <= 0) {
-                                        // Road exited through south boundary, move to previous Z-chunk
-                                        road.currentZChunk -= 1;
-                                    }
-                                }
-
-                                generatedHeightmaps.put(chunk, terrain);
-                                loadingHeightmaps.remove(chunk);
+                            if (terrain == null) {
+                                generateTerrain(chunk);
                             }
 
-                            Mesh mesh = generator.generateChunkMesh(generatedHeightmaps.get(chunk));
+                            // Generate road if this parent chunk is on the road's path
+                            if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk) {
+                                generateRoad(terrain, chunk);
+                            }
+
+                            Mesh mesh = generator.generateChunkMesh(terrain);
                             Geometry chunkGeom = generator.createGeometry(chunk, mesh);
 
                             loadedChunks.put(chunk, chunkGeom);
@@ -139,6 +101,7 @@ public class ChunkManager {
                             });
                         } catch (Exception e) {
                             e.printStackTrace();
+                            System.out.println(chunk);
                         } finally {
                             loadingChunks.remove(chunk);
                         }
@@ -158,6 +121,40 @@ public class ChunkManager {
             }
             return false;
         });
+    }
+
+    private void generateTerrain(ChunkCoord chunk) throws IOException {
+        loadingHeightmaps.add(chunk);
+        float[][] terrain = generator.generateHeightMap(chunk);
+
+        generatedHeightmaps.put(chunk, terrain);
+        loadingHeightmaps.remove(chunk);
+    }
+
+    private void generateRoad(float[][] terrain, ChunkCoord chunk) {
+        Integer startX;
+        Integer startZ;
+        if (road.verticalExitUp) {
+            System.out.println("upward exit");
+            startZ = CHUNK_SIZE - 1;
+            startX = road.lastXCoord;
+        } else if (road.verticalExitDown) {
+            System.out.println("downward exit");
+            startZ = 0;
+            startX = road.lastXCoord;
+        } else {
+            System.out.println("normal exit");
+            startZ = road.lastZCoord;
+            startX = 0;
+        }
+        System.out.println(startX);
+        System.out.println(startZ);
+        List<jMonkeyEngine.Road.Node> pathPoints = road.getRoadPointsInChunk(terrain, startX,
+                                                                             startZ, CHUNK_SIZE - 1,
+                                                                             CHUNK_SIZE / 2);
+
+        generator.updateHeightMap(terrain, pathPoints, chunk);
+        generatedRoads.put(chunk, pathPoints);
     }
 
     public float getHeight(int MAX_HEIGHT, int x, int z, ChunkCoord chunk) {

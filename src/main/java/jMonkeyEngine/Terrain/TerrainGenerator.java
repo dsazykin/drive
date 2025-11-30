@@ -231,7 +231,7 @@ public class TerrainGenerator{
     }
 
     /**
-     * Save current generated terrain to disk
+     * Save current generated terrain to disk.
      */
     public boolean saveGeneratedTerrain(String name) {
         if (lastGeneratedTerrain == null) {
