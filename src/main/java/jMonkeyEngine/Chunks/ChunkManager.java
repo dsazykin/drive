@@ -181,7 +181,12 @@ public class ChunkManager {
             // Add road geometry if it exists for this chunk
             List<jMonkeyEngine.Road.Node> roadPoints = generatedRoads.get(chunk);
             if (roadPoints != null && !roadPoints.isEmpty()) {
-                Geometry roadGeom = generator.generateRoadGeometry(roadPoints, chunk, terrain);
+                Geometry roadGeom = generator.generateRoadGeometry(roadPoints, chunk, terrain,
+                                                                   road.lastRoadNode,
+                                                                   road.lastChunkCoord, road.lastHeightmap);
+                road.lastRoadNode = roadPoints.get(roadPoints.size() - 1);
+                road.lastChunkCoord = chunk;
+                road.lastHeightmap = terrain;
                 if (roadGeom != null) {
                     // Add physics to the road
                     RigidBodyControl roadPhysics = new RigidBodyControl(0f); // 0f = static (immovable)

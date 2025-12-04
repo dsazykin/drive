@@ -1,5 +1,7 @@
 package jMonkeyEngine.Road;
 
+import jMonkeyEngine.Chunks.ChunkCoord;
+import jMonkeyEngine.Chunks.ChunkManager;
 import java.util.*;
 
 public class RoadGenerator {
@@ -10,6 +12,10 @@ public class RoadGenerator {
     public Integer lastXCoord = null;
     public boolean verticalExitUp = false;
     public boolean verticalExitDown = false;
+
+    public Node lastRoadNode = null;
+    public ChunkCoord lastChunkCoord = null;
+    public float[][] lastHeightmap = null;
 
     // Tuning constants
     private static final float TURN_WEIGHT = 50f;   // penalty strength for turning
@@ -30,9 +36,6 @@ public class RoadGenerator {
                         offsets.add(new int[]{dx, dy});
                     }
                 }
-            }
-            for (int[] offset : offsets) {
-                System.out.println(Arrays.toString(offset));
             }
             return Collections.unmodifiableList(offsets);
         });
@@ -220,6 +223,7 @@ public class RoadGenerator {
             cur = cur.parent;
         }
         Collections.reverse(path);
+
         return path;
     }
 }
