@@ -59,124 +59,114 @@ public class HeightMapGenerator {
     }
 
     public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath, ChunkCoord chunk) {
-        float halfWidth = ROAD_WIDTH / 2f;
+        if (roadPath.size() < 2) return;
 
-        float[][] targetHeights = new float[heightmap.length][heightmap[0].length];
-        boolean[][] hasTarget = new boolean[heightmap.length][heightmap[0].length];
+        // 1. PRE-CALCULATE AND SMOOTH NODE HEIGHTS
+        // We treat the road as a 3D ribbon. We determine the Y (height) for every Node first.
+        float[] nodeHeights = new float[roadPath.size()];
 
-        // Interpolate points for smooth curves
-        int subdivisions = 8; // Points between each control point
+        // Step A: Sample raw terrain height at every node
+        for (int i = 0; i < roadPath.size(); i++) {
+            Node n = roadPath.get(i);
+            nodeHeights[i] = sampleHeight(heightmap, n.x, n.y);
+        }
+
+        // Step B: Smooth the vertical profile (Iterative averaging)
+        // This removes sudden spikes/dips, making the road gradient gradual.
+        // Run this pass 5-10 times for a smoother road.
+        int smoothingPasses = 10;
+        for (int p = 0; p < smoothingPasses; p++) {
+            float[] smoothed = nodeHeights.clone();
+            for (int i = 1; i < roadPath.size() - 1; i++) {
+                // Average previous, current, and next height
+                smoothed[i] = (nodeHeights[i - 1] + nodeHeights[i] + nodeHeights[i + 1]) / 3f;
+            }
+            nodeHeights = smoothed;
+        }
+
+        // 2. RASTERIZE THE ROAD
+        // We use a "Brush" approach. For every step on the spline, we affect the surrounding pixels.
+
+        // How wide the flat asphalt is
+        float roadRadius = ROAD_WIDTH / 2f;
+        // How wide the blended shoulder is (the slope connecting road to terrain)
+        float blendDistance = 6.0f;
+        float totalEffectRadius = roadRadius + blendDistance;
+
+        int subdivisions = 10; // Higher subdivisions = fewer gaps in the rasterization
 
         for (int i = 0; i < roadPath.size() - 1; i++) {
-            // Get control points for Catmull-Rom spline
+            // Catmull-Rom Control Points
             Node p0 = (i > 0) ? roadPath.get(i - 1) : roadPath.get(i);
             Node p1 = roadPath.get(i);
             Node p2 = roadPath.get(i + 1);
             Node p3 = (i < roadPath.size() - 2) ? roadPath.get(i + 2) : roadPath.get(i + 1);
 
-            // Interpolate between p1 and p2
+            // Height Control Points
+            float h0 = (i > 0) ? nodeHeights[i - 1] : nodeHeights[i];
+            float h1 = nodeHeights[i];
+            float h2 = nodeHeights[i + 1];
+            float h3 = (i < roadPath.size() - 2) ? nodeHeights[i + 2] : nodeHeights[i + 1];
+
             for (int j = 0; j < subdivisions; j++) {
                 float t = (float) j / subdivisions;
 
-                // Catmull-Rom interpolation
+                // Pre-calculate powers of t
                 float t2 = t * t;
                 float t3 = t2 * t;
 
+                // Catmull-Rom coefficients
                 float coef0 = -0.5f * t3 + t2 - 0.5f * t;
                 float coef1 = 1.5f * t3 - 2.5f * t2 + 1.0f;
                 float coef2 = -1.5f * t3 + 2.0f * t2 + 0.5f * t;
                 float coef3 = 0.5f * t3 - 0.5f * t2;
 
+                // INTERPOLATE 3D POSITION (X, Z, and Height)
+                // Note: Your Node.y is actually the Z coordinate in 3D space
                 float cx = coef0 * p0.x + coef1 * p1.x + coef2 * p2.x + coef3 * p3.x;
                 float cz = coef0 * p0.y + coef1 * p1.y + coef2 * p2.y + coef3 * p3.y;
+                float cy = coef0 * h0 + coef1 * h1 + coef2 * h2 + coef3 * h3; // Calculated Road Height
 
-                // Calculate tangent direction for perpendicular
-                float dx = 0, dz = 0;
-                if (j == 0 && i > 0) {
-                    dx = p2.x - p1.x;
-                    dz = p2.y - p1.y;
-                } else if (j < subdivisions - 1) {
-                    // Next point on curve
-                    float tNext = (float)(j + 1) / subdivisions;
-                    float t2Next = tNext * tNext;
-                    float t3Next = t2Next * tNext;
+                // Apply to terrain within radius
+                int minX = (int) Math.floor(cx - totalEffectRadius);
+                int maxX = (int) Math.ceil(cx + totalEffectRadius);
+                int minZ = (int) Math.floor(cz - totalEffectRadius);
+                int maxZ = (int) Math.ceil(cz + totalEffectRadius);
 
-                    float coef0Next = -0.5f * t3Next + t2Next - 0.5f * tNext;
-                    float coef1Next = 1.5f * t3Next - 2.5f * t2Next + 1.0f;
-                    float coef2Next = -1.5f * t3Next + 2.0f * t2Next + 0.5f * tNext;
-                    float coef3Next = 0.5f * t3Next - 0.5f * t2Next;
+                for (int x = minX; x <= maxX; x++) {
+                    for (int z = minZ; z <= maxZ; z++) {
+                        // Bounds check
+                        if (x < 0 || z < 0 || x >= heightmap.length || z >= heightmap[0].length) continue;
 
-                    float cxNext = coef0Next * p0.x + coef1Next * p1.x + coef2Next * p2.x + coef3Next * p3.x;
-                    float czNext = coef0Next * p0.y + coef1Next * p1.y + coef2Next * p2.y + coef3Next * p3.y;
+                        float dx = x - cx;
+                        float dz = z - cz;
+                        float distSq = dx * dx + dz * dz;
 
-                    dx = cxNext - cx;
-                    dz = czNext - cz;
-                } else {
-                    dx = p2.x - p1.x;
-                    dz = p2.y - p1.y;
-                }
+                        // Optimization: Skip if outside total radius
+                        if (distSq > totalEffectRadius * totalEffectRadius) continue;
 
-                float segLength = (float) Math.sqrt(dx * dx + dz * dz);
-                if (segLength > 0.01f) {
-                    dx /= segLength;
-                    dz /= segLength;
-                }
+                        float dist = (float) Math.sqrt(distSq);
 
-                float px = -dz;
-                float pz = dx;
+                        // 3. APPLY HEIGHT BLENDING
+                        if (dist <= roadRadius) {
+                            // We are on the asphalt: Hard set to road height
+                            heightmap[x][z] = cy;
+                        } else if (dist < totalEffectRadius) {
+                            // We are on the shoulder: Blend from road height to terrain height
+                            // Calculate blend factor (0.0 at road edge, 1.0 at outer edge)
+                            float blendFactor = (dist - roadRadius) / blendDistance;
 
+                            // Use smoothstep for nicer transition curves
+                            blendFactor = blendFactor * blendFactor * (3 - 2 * blendFactor);
 
-                float lx = cx + px * halfWidth;
-                float lz = cz + pz * halfWidth;
-                float rx = cx - px * halfWidth;
-                float rz = cz - pz * halfWidth;
-
-                float count = 0;
-                float leftH = sampleHeight(heightmap, lx, lz);
-                if (leftH != 0) count++;
-                float rightH = sampleHeight(heightmap, rx, rz);
-                if (rightH != 0) count++;
-                float currHeight = (leftH + rightH) / count;
-
-                if (prevHeight != Float.MAX_VALUE) {
-                    currHeight = prevHeight * 0.98f + currHeight * 0.02f;
-                }
-
-                prevHeight = currHeight;
-                float targetHeight = currHeight;
-
-                for (float offset = -halfWidth; offset <= halfWidth; offset += 1f) {
-                    float ix = Math.round(cx + px * offset);
-                    float iz = Math.round(cz + pz * offset);
-
-                    int x = Math.round(ix);
-                    int z = Math.round(iz);
-                    if (x < 0 || z < 0 || x >= heightmap.length || z >= heightmap[0].length) continue;
-                    if (hasTarget[x][z]) continue;
-
-                    targetHeights[x][z] = targetHeight;
-                    hasTarget[x][z] = true;
+                            float originalHeight = heightmap[x][z];
+                            // Linear Interpolation (Lerp)
+                            heightmap[x][z] = cy * (1 - blendFactor) + originalHeight * blendFactor;
+                        }
+                    }
                 }
             }
         }
-
-        for (int x = 0; x < heightmap.length; x++) {
-            for (int z = 0; z < heightmap[0].length; z++) {
-                if (hasTarget[x][z]) {
-                    heightmap[x][z] = targetHeights[x][z];
-                }
-            }
-        }
-
-        smoothRoad(heightmap, hasTarget, targetHeights);
-
-        blendTerrain(heightmap, hasTarget, targetHeights);
-
-//        try {
-//            generateImage(chunk.x, chunk.z, heightmap);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
     }
 
     private static void smoothRoad(float[][] heightmap, boolean[][] hasTarget,
