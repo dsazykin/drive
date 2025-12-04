@@ -109,20 +109,22 @@ public class ChunkManager {
                             if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk && !loadingRoads.contains(chunk)) {
                                 loadingRoads.add(chunk);
 
-                                Geometry geometry = generatedChunks.get(chunk);
+                                Geometry geometry = loadedChunks.get(chunk);
                                 Geometry oldRoadGeom = loadedRoads.get(chunk);
 
                                 main.enqueue(() -> {
-                                    geometry.removeFromParent();
-                                    bulletAppState.getPhysicsSpace().remove(geometry);
-
-                                    // Remove old road physics
+                                    if (geometry != null) {
+                                        geometry.removeFromParent();
+                                        bulletAppState.getPhysicsSpace().remove(geometry);
+                                        loadedChunks.remove(chunk);
+                                    }
                                     if (oldRoadGeom != null) {
                                         RigidBodyControl oldRoadPhysics = oldRoadGeom.getControl(RigidBodyControl.class);
                                         if (oldRoadPhysics != null) {
                                             bulletAppState.getPhysicsSpace().remove(oldRoadPhysics);
                                         }
                                         oldRoadGeom.removeFromParent();
+                                        loadedRoads.remove(chunk);
                                     }
                                 });
 
