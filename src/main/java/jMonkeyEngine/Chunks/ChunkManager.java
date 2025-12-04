@@ -217,7 +217,7 @@ public class ChunkManager {
                                                                              startZ, CHUNK_SIZE - 1,
                                                                              CHUNK_SIZE / 2);
 
-        generator.updateHeightMap(terrain, pathPoints, chunk);
+        generator.updateHeightMap(terrain, pathPoints);
         generatedRoads.put(chunk, pathPoints);
     }
 

@@ -58,7 +58,7 @@ public class HeightMapGenerator {
         return heightmap;
     }
 
-    public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath, ChunkCoord chunk) {
+    public void applyRoadFlattening(float[][] heightmap, List<Node> roadPath) {
         if (roadPath.size() < 2) return;
 
         // 1. PRE-CALCULATE AND SMOOTH NODE HEIGHTS
@@ -162,56 +162,6 @@ public class HeightMapGenerator {
                             float originalHeight = heightmap[x][z];
                             // Linear Interpolation (Lerp)
                             heightmap[x][z] = cy * (1 - blendFactor) + originalHeight * blendFactor;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private static void smoothRoad(float[][] heightmap, boolean[][] hasTarget,
-                                  float[][] targetHeights) {
-        for (int x = 1; x < heightmap.length - 1; x++) {
-            for (int z = 1; z < heightmap[0].length - 1; z++) {
-                if (hasTarget[x][z]) {
-                    float sum = targetHeights[x][z];
-                    int count = 1;
-
-                    if (hasTarget[x-1][z]) { sum += targetHeights[x-1][z]; count++; }
-                    if (hasTarget[x+1][z]) { sum += targetHeights[x+1][z]; count++; }
-                    if (hasTarget[x][z-1]) { sum += targetHeights[x][z-1]; count++; }
-                    if (hasTarget[x][z+1]) { sum += targetHeights[x][z+1]; count++; }
-
-                    heightmap[x][z] = sum / count;
-                }
-            }
-        }
-    }
-
-    private static void blendTerrain(float[][] heightmap, boolean[][] hasTarget,
-                                  float[][] targetHeights) {
-        int featherRadius = 4;
-
-        for (int x = 0; x < heightmap.length; x++) {
-            for (int z = 0; z < heightmap[0].length; z++) {
-                if (hasTarget[x][z]) {
-                    float roadH = targetHeights[x][z];
-
-                    for (int dx = -featherRadius; dx <= featherRadius; dx++) {
-                        for (int dz = -featherRadius; dz <= featherRadius; dz++) {
-                            int nx = x + dx;
-                            int nz = z + dz;
-                            if (nx < 0 || nz < 0 || nx >= heightmap.length || nz >= heightmap[0].length) continue;
-                            if (hasTarget[nx][nz]) continue;
-
-                            float dist = (float)Math.sqrt(dx*dx + dz*dz);
-                            if (dist > featherRadius) continue;
-
-                            float t = dist / featherRadius;
-                            float originalH = heightmap[nx][nz];
-                            float blendedH = roadH * (1 - t) + originalH * t;
-
-                            heightmap[nx][nz] = blendedH;
                         }
                     }
                 }
@@ -367,7 +317,7 @@ public class HeightMapGenerator {
             }
             if (path != null) {
                 System.out.println("applying road to chunk: " + chunk.x + ", " + chunk.z);
-                generator.applyRoadFlattening(heightmap, path, chunk);
+                generator.applyRoadFlattening(heightmap, path);
                 x = road.currentXChunk;
                 z = road.currentZChunk;
                 count++;

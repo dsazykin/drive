@@ -78,8 +78,8 @@ public class TerrainGenerator{
         return heightMap.generateHeightmap(chunk.x, chunk.z);
     }
 
-    public void updateHeightMap(float[][] terrain, List<jMonkeyEngine.Road.Node> pathPoints, ChunkCoord chunk) {
-        heightMap.applyRoadFlattening(terrain, pathPoints, chunk);
+    public void updateHeightMap(float[][] terrain, List<jMonkeyEngine.Road.Node> pathPoints) {
+        heightMap.applyRoadFlattening(terrain, pathPoints);
     }
 
     public Geometry generateRoadGeometry(List<jMonkeyEngine.Road.Node> pathPoints, ChunkCoord chunk, float[][] heightmap) {
@@ -309,7 +309,7 @@ public class TerrainGenerator{
             List<jMonkeyEngine.Road.Node> pathPoints =
                     road.getRoadPointsInChunk(terrain, 0, CHUNK_SIZE / 2, CHUNK_SIZE - 1,
                                               CHUNK_SIZE / 2);
-            updateHeightMap(terrain, pathPoints, chunk);
+            updateHeightMap(terrain, pathPoints);
 
             Mesh mesh = generateChunkMesh(terrain);
             Geometry chunkGeom = createGeometry(chunk, mesh);

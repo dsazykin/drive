@@ -12,8 +12,8 @@ public class RoadGenerator {
     public boolean verticalExitDown = false;
 
     // Tuning constants
-    private static final float TURN_WEIGHT = 200f;   // penalty strength for turning
-    private static final float NO_UTURN_COS = -0.25f; // disallow turns sharper than ~104 degrees
+    private static final float TURN_WEIGHT = 50f;   // penalty strength for turning
+    private static final float NO_UTURN_COS = 0.2588190451f; // disallow turns sharper than ~75 degrees
 
     // Cache offsets per radius to avoid recomputation
     private final Map<Integer, List<int[]>> offsetCache = new HashMap<>();
