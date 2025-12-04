@@ -157,6 +157,7 @@ public class ChunkManager {
                         bulletAppState.getPhysicsSpace().remove(roadPhysics);
                     }
                     roadGeom.removeFromParent();
+                    loadedRoads.remove(entry.getKey());
                 }
 
                 return true;
