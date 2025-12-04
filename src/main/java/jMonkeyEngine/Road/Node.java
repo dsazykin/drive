@@ -11,7 +11,7 @@ public class Node implements Comparable<Node>, Serializable {
     public float gCost; // cost from start
     public float fCost; // gCost + heuristic
     public Node parent;
-    public int dxFromParent, dyFromParent;
+    public float dxFromParent, dyFromParent;
     public float dirMag;
 
     public Node(int x, int y) {
