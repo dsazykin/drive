@@ -39,6 +39,8 @@ public class ChunkManager {
     private final ConcurrentHashMap<ChunkCoord, Geometry> generatedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, float[][]> generatedHeightmaps = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>> generatedRoads = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ChunkCoord, ChunkCoord> nextRoadChunkMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ChunkCoord, ChunkCoord> prevRoadChunkMap = new ConcurrentHashMap<>();
 
     public ChunkManager(BulletAppState bulletAppState, Node rootNode, RoadGenerator road,
                         TerrainGenerator generator, SimpleApplication main, ExecutorService executor,
@@ -178,6 +180,8 @@ public class ChunkManager {
         if (!roadPointsInChunk.containsKey(chunk)) {
             System.out.println("WARNING: Pathfinder returned no key for current chunk " + chunk + ". Creating empty list.");
             roadPointsInChunk.put(chunk, new ArrayList<>());
+        } else {
+            System.out.println("Generated " + roadPointsInChunk.get(chunk).size() + " road points for chunk " + chunk);
         }
 
         // SAVE ALL DATA: Current Chunk AND Neighbors
@@ -188,11 +192,18 @@ public class ChunkManager {
             // Store points so neighbor chunks can find them later
             generatedRoads.put(coord, points);
 
+            if (!coord.equals(chunk)) {
+                nextRoadChunkMap.put(chunk, coord);
+                prevRoadChunkMap.put(coord, chunk);
+            }
+
             // If this is the active chunk, update the terrain heightmap immediately
             if (coord.equals(chunk)) {
                 generator.updateHeightMap(terrain, points);
             }
         }
+
+        System.out.println("next road chunk: (" + road.currentXChunk + ", " + road.currentZChunk + ")");
     }
 
     private void buildAndAttachChunk(float[][] terrain, ChunkCoord chunk) {
@@ -239,9 +250,35 @@ public class ChunkManager {
             return;
         }
 
+        // --- STEP 1: FIND GHOST NODES ---
+        jMonkeyEngine.Road.Node prevGhost = null;
+        jMonkeyEngine.Road.Node nextGhost = null;
+
+        // A. Find Previous Ghost
+        // Look up who connects TO us
+        ChunkCoord prevChunkCoord = prevRoadChunkMap.get(chunk);
+        if (prevChunkCoord != null) {
+            List<jMonkeyEngine.Road.Node> prevPoints = generatedRoads.get(prevChunkCoord);
+            if (prevPoints != null && !prevPoints.isEmpty()) {
+                // The ghost is the LAST node of the PREVIOUS chunk
+                prevGhost = prevPoints.get(prevPoints.size() - 1);
+            }
+        }
+
+        // B. Find Next Ghost
+        // Look up who we connect TO
+        ChunkCoord nextChunkCoord = nextRoadChunkMap.get(chunk);
+        if (nextChunkCoord != null) {
+            List<jMonkeyEngine.Road.Node> nextPoints = generatedRoads.get(nextChunkCoord);
+            if (nextPoints != null && !nextPoints.isEmpty()) {
+                // The ghost is the FIRST node of the NEXT chunk
+                nextGhost = nextPoints.get(0);
+            }
+        }
+
         Geometry roadGeom;
         synchronized (roadLock) {
-            roadGeom = generator.generateRoadGeometry(roadPoints, chunk, terrain);
+            roadGeom = generator.generateRoadGeometry(roadPoints, chunk, terrain, prevGhost, nextGhost);
 
             // Only update state if generation was successful
             if (roadGeom != null) {
@@ -324,5 +361,13 @@ public class ChunkManager {
 
     public float[][] getHeightmap(ChunkCoord chunk) {
         return generatedHeightmaps.get(chunk);
+    }
+
+    public void setPrevRoadChunk(ChunkCoord from, ChunkCoord to) {
+        prevRoadChunkMap.put(from, to);
+    }
+
+    public void setNextRoadChunk(ChunkCoord from, ChunkCoord to) {
+        nextRoadChunkMap.put(from, to);
     }
 }

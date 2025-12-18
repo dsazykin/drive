@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -84,8 +85,9 @@ public class TerrainGenerator{
     }
 
     public Geometry generateRoadGeometry(List<jMonkeyEngine.Road.Node> pathPoints,
-                                         ChunkCoord chunk, float[][] heightmap) {
-        return roadMeshGenerator.generateRoadGeometry(pathPoints, chunk, heightmap);
+                                         ChunkCoord chunk, float[][] heightmap, jMonkeyEngine.Road.Node prevGhostNode, jMonkeyEngine.Road.Node nextGhostNode) {
+        return roadMeshGenerator.generateRoadGeometry(pathPoints, chunk, heightmap, prevGhostNode
+                , nextGhostNode);
     }
 
     public Mesh generateChunkMesh(float[][] terrain){
@@ -311,12 +313,30 @@ public class TerrainGenerator{
             HashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>>
                     roadPointsInChunk = road.getRoadPointsInChunk(terrain, null, 0,
                                                                   CHUNK_SIZE / 2, 300, chunk);
-            System.out.println(roadPointsInChunk.keySet());
-            List<jMonkeyEngine.Road.Node> pathPoints = roadPointsInChunk.get(chunk);
-            if (pathPoints == null) {
-                pathPoints = new ArrayList<>();
+            if (!roadPointsInChunk.containsKey(chunk)) {
+                System.out.println("WARNING: Pathfinder returned no key for current chunk " + chunk + ". Creating empty list.");
+                roadPointsInChunk.put(chunk, new ArrayList<>());
+            } else {
+                System.out.println("Generated " + roadPointsInChunk.get(chunk).size() + " road points for chunk " + chunk);
             }
-            updateHeightMap(terrain, pathPoints);
+
+            // SAVE ALL DATA: Current Chunk AND Neighbors
+            List<jMonkeyEngine.Road.Node> pathPoints = new ArrayList<>();
+            for (Map.Entry<ChunkCoord, List<jMonkeyEngine.Road.Node>> entry : roadPointsInChunk.entrySet()) {
+                ChunkCoord coord = entry.getKey();
+                List<jMonkeyEngine.Road.Node> points = entry.getValue();
+
+                if (!coord.equals(chunk)) {
+                    manager.setNextRoadChunk(chunk, coord);
+                    manager.setPrevRoadChunk(coord, chunk);
+                }
+
+                // If this is the active chunk, update the terrain heightmap immediately
+                if (coord.equals(chunk)) {
+                    pathPoints = points;
+                    updateHeightMap(terrain, points);
+                }
+            }
 
             Mesh mesh = generateChunkMesh(terrain);
             Geometry chunkGeom = createGeometry(chunk, mesh);
