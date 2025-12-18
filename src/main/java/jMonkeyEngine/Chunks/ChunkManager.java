@@ -241,9 +241,7 @@ public class ChunkManager {
 
         Geometry roadGeom;
         synchronized (roadLock) {
-            roadGeom = generator.generateRoadGeometry(roadPoints, chunk, terrain,
-                                                      road.lastRoadNode,
-                                                      road.lastChunkCoord, road.lastHeightmap);
+            roadGeom = generator.generateRoadGeometry(roadPoints, chunk, terrain);
 
             // Only update state if generation was successful
             if (roadGeom != null) {

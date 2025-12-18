@@ -84,11 +84,8 @@ public class TerrainGenerator{
     }
 
     public Geometry generateRoadGeometry(List<jMonkeyEngine.Road.Node> pathPoints,
-                                         ChunkCoord chunk, float[][] heightmap,
-                                         jMonkeyEngine.Road.Node lastRoadNode,
-                                         ChunkCoord lastChunkCoord, float[][] lastGeneratedTerrain) {
-        return roadMeshGenerator.generateRoadGeometry(pathPoints, chunk, heightmap, lastRoadNode,
-                                                      lastChunkCoord, lastGeneratedTerrain);
+                                         ChunkCoord chunk, float[][] heightmap) {
+        return roadMeshGenerator.generateRoadGeometry(pathPoints, chunk, heightmap);
     }
 
     public Mesh generateChunkMesh(float[][] terrain){

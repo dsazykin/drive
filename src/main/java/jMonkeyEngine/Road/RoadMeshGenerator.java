@@ -35,23 +35,11 @@ public class RoadMeshGenerator {
     }
 
     public Geometry generateRoadGeometry(List<Node> roadPoints, ChunkCoord chunk,
-                                         float[][] heightmap,
-                                         Node lastRoadNode, ChunkCoord lastChunkCoord,
-                                         float[][] prevHeightmap) {
+                                         float[][] heightmap) {
 
         if (roadPoints == null || roadPoints.size() < 2) return null;
 
-        Node ghostNode = null;
-        int xOffset = 0;
-        int zOffset = 0;
-
-        if (lastRoadNode != null && lastChunkCoord != null) {
-            xOffset = (lastChunkCoord.x - chunk.x) * (CHUNK_SIZE - 1);
-            zOffset = (lastChunkCoord.z - chunk.z) * (CHUNK_SIZE - 1);
-            ghostNode = new Node(lastRoadNode.x + xOffset, lastRoadNode.y + zOffset);
-        }
-
-        List<Vector3f> smoothPath = interpolateRoadPath(roadPoints, heightmap, ghostNode, prevHeightmap, xOffset, zOffset);
+        List<Vector3f> smoothPath = interpolateRoadPath(roadPoints, heightmap);
 
         if (smoothPath.size() < 2) return null;
 
@@ -197,9 +185,7 @@ public class RoadMeshGenerator {
         return Math.max(min, Math.min(max, v));
     }
 
-    private List<Vector3f> interpolateRoadPath(List<Node> roadPoints, float[][] heightmap,
-                                               Node ghostNode, float[][] prevHeightmap,
-                                               int prevXOffset, int prevZOffset) {
+    private List<Vector3f> interpolateRoadPath(List<Node> roadPoints, float[][] heightmap) {
         List<Vector3f> smoothPath = new ArrayList<>();
         if (roadPoints.size() < 2) return smoothPath;
 
@@ -210,55 +196,11 @@ public class RoadMeshGenerator {
         float startX = roadPoints.get(0).x * unit;
         float startZ = roadPoints.get(0).y * unit;
 
-        boolean useGhost = false;
-
-        if (ghostNode != null) {
-            float ghostX = ghostNode.x * unit;
-            float ghostZ = ghostNode.y * unit;
-
-            // Calculate distance squared to avoid slow Sqrt
-            float dx = ghostX - startX;
-            float dz = ghostZ - startZ;
-            float distSq = dx*dx + dz*dz;
-
-            // INCREASE THRESHOLD: If they are further than ~0.1 units (adjust based on scale)
-            // we treat them as separate. Otherwise, we assume they are the connecting point.
-            if (distSq > 0.01f) {
-                float height = sampleHeightFromTwoChunks(
-                        heightmap, prevHeightmap,
-                        ghostNode.x, ghostNode.y,
-                        prevXOffset, prevZOffset
-                ) * MAX_HEIGHT;
-                controlPoints.add(new Vector3f(ghostX, height, ghostZ));
-                useGhost = true;
-            } else {
-                // CRITICAL FIX: If they are too close, snap P0 to Ghost to prevent holes,
-                // but DO NOT add Ghost to the list. P0 becomes the start.
-                // This prevents the "micro-segment" loop.
-                float height = sampleHeightFromTwoChunks(
-                        heightmap, prevHeightmap,
-                        ghostNode.x, ghostNode.y,
-                        prevXOffset, prevZOffset
-                ) * MAX_HEIGHT;
-
-                // We will add this snapped position as the first point below
-                startX = ghostX;
-                startZ = ghostZ;
-                // You might want to override the height of roadPoints[0] here too
-            }
-        }
-
         // 2. Add current points
         for (int i = 0; i < roadPoints.size(); i++) {
             Node node = roadPoints.get(i);
             float x = node.x * unit;
             float z = node.y * unit;
-
-            // If we snapped P0 to Ghost, ensure we use those coords for i==0
-            if (!useGhost && i == 0 && ghostNode != null) {
-                x = ghostNode.x * unit;
-                z = ghostNode.y * unit;
-            }
 
             float height = sampleHeight(heightmap, node.x, node.y) * MAX_HEIGHT;
             controlPoints.add(new Vector3f(x, height, z));
@@ -267,7 +209,7 @@ public class RoadMeshGenerator {
         // 3. Generate Spline
         // If we used a ghost, we start interpolation at index 1 (using ghost as tangent control)
         // If we didn't use a ghost, we start at index 0
-        int startIndex = useGhost ? 1 : 0;
+        int startIndex = 0;
 
         int subdivisions = 8;
         for (int i = startIndex; i < controlPoints.size() - 1; i++) {
