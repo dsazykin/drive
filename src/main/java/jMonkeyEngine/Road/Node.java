@@ -1,5 +1,6 @@
 package jMonkeyEngine.Road;
 
+import jMonkeyEngine.Chunks.ChunkCoord;
 import java.io.Serializable;
 
 public class Node implements Comparable<Node>, Serializable {
@@ -7,6 +8,7 @@ public class Node implements Comparable<Node>, Serializable {
 
     public int x;
     public int y;
+    public ChunkCoord chunk;
     public float height;
     public float gCost; // cost from start
     public float fCost; // gCost + heuristic
@@ -15,15 +17,16 @@ public class Node implements Comparable<Node>, Serializable {
     public float dirMag;
 
     public Node(int x, int y) {
-        this(x, y, 0, 0, 0, null, 0, 0);
+        this(x, y, 0, 0, 0, null, 0, 0, null);
     }
 
-    public Node(int x, int y, float height, float gCost, float fCost, Node parent) {
-        this(x, y, height, gCost, fCost, parent, 0, 0);
+    public Node(int x, int y, float height, float gCost, float fCost, Node parent,
+                ChunkCoord chunk) {
+        this(x, y, height, gCost, fCost, parent, 0, 0, chunk);
     }
 
     public Node(int x, int y, float height, float gCost, float fCost, Node parent, int dx,
-                int dy) {
+                int dy, ChunkCoord chunk) {
         this.x = x;
         this.y = y;
         this.height = height;
@@ -33,6 +36,7 @@ public class Node implements Comparable<Node>, Serializable {
         this.dxFromParent = dx;
         this.dyFromParent = dy;
         this.dirMag = (float) Math.sqrt(dxFromParent * dxFromParent + dyFromParent * dyFromParent);
+        this.chunk = chunk;
     }
 
     @Override

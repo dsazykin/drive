@@ -1,10 +1,14 @@
 package jMonkeyEngine.Road;
 
+import com.jme3.scene.Geometry;
 import jMonkeyEngine.Chunks.ChunkCoord;
 import jMonkeyEngine.Chunks.ChunkManager;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class RoadGenerator {
+
+    ChunkManager manager;
 
     public int currentXChunk = 0;
     public int currentZChunk = 0;
@@ -24,6 +28,14 @@ public class RoadGenerator {
     // Tuning constants
     private static final float TURN_WEIGHT = 50f;   // penalty strength for turning
     private static final float NO_UTURN_COS = 0.2588190451f; // disallow turns sharper than ~75 degrees
+    private final int MIN_CONTINUATION = 10; // minimum distance to travel into next chunk
+
+    private boolean isInMainChunk = true;
+    private final ConcurrentHashMap<ChunkCoord, float[][]> heightmaps = new ConcurrentHashMap<>();
+    
+    public void setManager(ChunkManager mgr) {
+        this.manager = mgr;
+    }
 
     // Cache offsets per radius to avoid recomputation
     private final Map<Integer, List<int[]>> offsetCache = new HashMap<>();
@@ -31,11 +43,17 @@ public class RoadGenerator {
     private List<int[]> generateOffsets(int radius) {
         return offsetCache.computeIfAbsent(radius, r -> {
             List<int[]> offsets = new ArrayList<>();
-            for (int dx = -r; dx <= r; dx++) {
+
+            // CHANGE 1: Start 'dx' at 1 instead of -r.
+            // This ensures every move has a positive X component (Forward).
+            for (int dx = 1; dx <= r; dx++) {
+
                 for (int dy = -r; dy <= r; dy++) {
-                    if (dx == 0 && dy == 0)
-                        continue;
+                    // (No need to check for 0,0 anymore since dx is never 0)
+
                     double dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // Select points that are roughly 'r' distance away (the arc)
                     if (Math.abs(dist - r) < 0.5) {
                         offsets.add(new int[]{dx, dy});
                     }
@@ -45,26 +63,31 @@ public class RoadGenerator {
         });
     }
 
-    public List<Node> getRoadPointsInChunk(float[][] heightmap, int startX, int startY, int goalX, int goalY) {
+    public HashMap<ChunkCoord, List<Node>> getRoadPointsInChunk(float[][] heightmap, int startX, int startY, int goalX, int goalY, ChunkCoord chunk) {
         int rows = heightmap.length;
         int cols = heightmap[0].length;
+
+        heightmaps.put(chunk, heightmap);
 
         verticalExitUp = false;
         verticalExitDown = false;
 
-        PriorityQueue<Node> openSet = new PriorityQueue<>();
-        boolean[][] visited = new boolean[rows][cols];
-        Node[][] nodeMap = new Node[rows][cols];
+        PriorityQueue<Node> currentSet = new PriorityQueue<>();
+        HashMap<ChunkCoord, boolean[][]> visitedMaps = new HashMap<>();
+        HashMap<ChunkCoord, Node[][]> nodeMaps = new HashMap<>();
+
+        visitedMaps.put(chunk, new boolean[rows][cols]);
+        nodeMaps.put(chunk, new Node[rows][cols]);
 
         Node start = new Node(startX, startY, getRoadHeight(startX, startY, heightmap), 0,
-                              heuristic(startX, startY, goalX, goalY), null);
+                              heuristic(startX, goalX), null, chunk);
 
         start.dxFromParent = lastExitDx;
         start.dyFromParent = lastExitDy;
         start.dirMag = (float) Math.sqrt(lastExitDx * lastExitDx + lastExitDy * lastExitDy);
 
-        openSet.add(start);
-        nodeMap[startX][startY] = start;
+        currentSet.add(start);
+        nodeMaps.get(chunk)[startX][startY] = start;
 
         boolean enteredFromTop = (startY >= cols - 1);
         boolean enteredFromBottom = (startY <= 0);
@@ -72,33 +95,83 @@ public class RoadGenerator {
 
         List<int[]> directions = generateOffsets(10);
 
-        while (!openSet.isEmpty()) {
-            Node current = openSet.poll();
+        while (!currentSet.isEmpty()) {
+            Node current = currentSet.poll();
 
-            if (current.x >= goalX) {
-                return reconstructPath(current);
-            }
+            ChunkCoord currentChunk = current.chunk;
 
             int distanceFromStart = Math.abs(current.y - startY);
-            if (current.parent != null) {
-                boolean canExitThroughEntry = distanceFromStart >= MIN_PROGRESS;
-                if (current.y <= 0) {
-                    if (!enteredFromBottom || canExitThroughEntry) {
-                        verticalExitDown = true;
-                        return reconstructPath(current);
+            boolean canExitThroughEntry = distanceFromStart >= MIN_PROGRESS;
+
+            if (current.parent != null && !currentChunk.equals(chunk)) {
+                List<Node> fullPath = null;
+
+                int dX = currentChunk.x - chunk.x;
+                int dZ = currentChunk.z - chunk.z;
+
+                if (dX > 0) {
+                    if (current.x >= MIN_CONTINUATION) {
+                        fullPath = reconstructPath(current);
                     }
-                } else if (current.y >= cols - 1) {
-                    if (!enteredFromTop || canExitThroughEntry) {
-                        verticalExitUp = true;
-                        return reconstructPath(current);
+                } else if(dZ > 0) {
+                    if (current.y >= MIN_CONTINUATION) {
+                        if (!enteredFromBottom || canExitThroughEntry) {
+                            verticalExitDown = true;
+                            fullPath = reconstructPath(current);
+                        }
+                    }
+                } else if (dZ < 0) {
+                    if (current.y <= cols - 1 - MIN_CONTINUATION) {
+                        if (!enteredFromTop || canExitThroughEntry) {
+                            verticalExitUp = true;
+                            fullPath = reconstructPath(current);
+                        }
                     }
                 }
+
+                if (fullPath != null) {
+                    HashMap<ChunkCoord, List<Node>> pathsByChunk = new HashMap<>();
+                    for (Node node : fullPath) {
+                        if (!pathsByChunk.containsKey(node.chunk)) {
+                            pathsByChunk.put(node.chunk, new ArrayList<>());
+                        } else {
+                            pathsByChunk.get(node.chunk).add(node);
+                        }
+                    }
+                    return pathsByChunk;
+                }
             }
+
+            float[][] currentHeightmap = heightmaps.get(currentChunk);
 
             for (int[] dir : directions) {
                 int nx = current.x + dir[0];
                 int ny = current.y + dir[1];
-                if (nx < 0 || ny < 0 || nx >= rows || ny >= cols || visited[nx][ny]) continue;
+
+                int chunkOffsetX = Math.floorDiv(nx, rows);
+                int chunkOffsetY = Math.floorDiv(ny, cols);
+
+                ChunkCoord targetChunk = new ChunkCoord(currentChunk.x + chunkOffsetX,
+                                                        currentChunk.z + chunkOffsetY);
+                float[][] targetHeightmap = currentHeightmap;
+
+                if (!targetChunk.equals(currentChunk)) {
+                    nx = Math.floorMod(nx, rows);
+                    ny = Math.floorMod(ny, cols);
+
+                    if (!visitedMaps.containsKey(targetChunk)) {
+                        visitedMaps.put(targetChunk, new boolean[rows][cols]);
+                        nodeMaps.put(targetChunk, new Node[rows][cols]);
+                    }
+
+                    if (!heightmaps.containsKey(targetChunk)) {
+                        heightmaps.put(targetChunk, manager.generateTerrain(targetChunk));
+                    }
+
+                    targetHeightmap = heightmaps.get(targetChunk);
+                }
+
+                if (visitedMaps.get(targetChunk)[nx][ny]) continue;
 
                 int dx = dir[0];
                 int dy = dir[1];
@@ -131,9 +204,13 @@ public class RoadGenerator {
                 // if (current == start) to STRONGLY discourage bending at the chunk seam.
                 float turnPenalty = TURN_WEIGHT * (1f - cos) * stepLen;
 
-                float heightWeight = 100.0f * (rows * 2);
-                float heightDiff = Math.abs(heightmap[current.x][current.y] - heightmap[nx][ny]);
-                float slopeAtNext = getSlopePenalty(nx, ny, heightmap);
+                float heightWeight = 50f * (rows * 2);
+                float h1 = currentHeightmap[current.x][current.y];
+                float h2 = targetHeightmap[nx][ny];
+
+                float heightDiff = Math.abs(h1 - h2);
+
+                float slopeAtNext = getSlopePenalty(nx, ny, targetHeightmap);
 
                 float SLOPE_WEIGHT = 50f * (rows * 2);
                 float terrainCost = (heightWeight * heightDiff) + (SLOPE_WEIGHT * slopeAtNext);
@@ -145,24 +222,30 @@ public class RoadGenerator {
 
                 float tentativeG = current.gCost + moveCost;
 
-                float roadHeight = getRoadHeight(nx, ny, heightmap);
-                Node neighbor = nodeMap[nx][ny];
+                float roadHeight = getRoadHeight(nx, ny, targetHeightmap);
+                Node neighbor = nodeMaps.get(targetChunk)[nx][ny];
                 if (neighbor == null || tentativeG < neighbor.gCost) {
-                    float h = heuristic(nx, ny, goalX, goalY);
+                    int chunkDifferenceX = targetChunk.x - chunk.x;
+                    int globalNodeX = (chunkDifferenceX * rows) + nx;
+
+                    float h = heuristic(globalNodeX, goalX);
 
                     // Store dx/dy in the neighbor so it can pass it to its children
-                    neighbor = new Node(nx, ny, roadHeight, tentativeG, tentativeG + h, current, dx, dy);
+                    neighbor = new Node(nx, ny, roadHeight, tentativeG, tentativeG + h, current,
+                                        dx, dy, targetChunk);
 
                     // Ensure magnitude is cached
                     neighbor.dirMag = stepLen;
 
-                    nodeMap[nx][ny] = neighbor;
-                    openSet.add(neighbor);
-                    visited[nx][ny] = true;
+                    nodeMaps.get(targetChunk)[nx][ny] = neighbor;
+                    currentSet.add(neighbor);
+                    visitedMaps.get(targetChunk)[nx][ny] = true;
                 }
             }
         }
-        return Collections.emptyList();
+        HashMap<ChunkCoord, List<Node>> emptyMap = new HashMap<>();
+        emptyMap.put(chunk, new ArrayList<>());
+        return emptyMap;
     }
 
     private float getRoadHeight(int x, int y, float[][] terrain) {
@@ -187,15 +270,15 @@ public class RoadGenerator {
         return (float) Math.sqrt(dx * dx + dz * dz);
     }
 
-    private float heuristic(int x1, int y1, int x2, int y2) {
-        return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+    private float heuristic(int x1, int x2) {
+        return Math.abs(x1 - x2);
     }
 
     private List<Node> reconstructPath(Node end) {
-        if (verticalExitUp) {
+        if (verticalExitDown) {
             currentZChunk++;
             lastXCoord = end.x;
-        } else if (verticalExitDown) {
+        } else if (verticalExitUp) {
             currentZChunk--;
             lastXCoord = end.x;
         } else {

@@ -71,7 +71,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
     private Node pauseMenuNode;
     private Node debugMenu;
 
-    private BitmapText speedText, frontLeftText, frontRightText, rearLeftText, rearRightText, chunkX, chunkZ, pauseText, startText;
+    private BitmapText speedText, frontLeftText, frontRightText, rearLeftText, rearRightText, chunkX, chunkZ, localX, localZ, pauseText, startText;
 
     private boolean loadingDone = false;
     private boolean isPaused = false;
@@ -132,6 +132,7 @@ public class GameplayState extends BaseAppState implements ActionListener {
                 new ChunkManager(bulletAppState, gameplayRoot, road, generator, sapp, executor,
                                  CHUNK_SIZE, SCALE, 2);
         generator.setChunkManager(manager);
+        road.setManager(manager);
 
         updateLoadingStage("Generating terrain...");
         loadScene();
@@ -379,6 +380,16 @@ public class GameplayState extends BaseAppState implements ActionListener {
         chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
         debugMenu.attachChild(chunkZ);
 
+        localX = new BitmapText(guiFont, false);
+        localX.setSize(guiFont.getCharSet().getRenderedSize());
+        localX.setLocalTranslation(cam.getWidth() - 220, cam.getHeight() - 10, 0);
+        debugMenu.attachChild(localX);
+
+        localZ = new BitmapText(guiFont, false);
+        localZ.setSize(guiFont.getCharSet().getRenderedSize());
+        localZ.setLocalTranslation(cam.getWidth() - 220, cam.getHeight() - 30, 0);
+        debugMenu.attachChild(localZ);
+
         guiLoaded = true;
     }
 
@@ -423,6 +434,16 @@ public class GameplayState extends BaseAppState implements ActionListener {
         chunkZ.setSize(guiFont.getCharSet().getRenderedSize());
         chunkZ.setLocalTranslation(cam.getWidth() - 100, cam.getHeight() - 30, 0);
         debugMenu.attachChild(chunkZ);
+
+        localX = new BitmapText(guiFont, false);
+        localX.setSize(guiFont.getCharSet().getRenderedSize());
+        localX.setLocalTranslation(cam.getWidth() - 220, cam.getHeight() - 10, 0);
+        debugMenu.attachChild(localX);
+
+        localZ = new BitmapText(guiFont, false);
+        localZ.setSize(guiFont.getCharSet().getRenderedSize());
+        localZ.setLocalTranslation(cam.getWidth() - 220, cam.getHeight() - 30, 0);
+        debugMenu.attachChild(localZ);
 
         hud.attachChild(pauseMenuNode);
         pauseText = new BitmapText(guiFont);
@@ -552,9 +573,13 @@ public class GameplayState extends BaseAppState implements ActionListener {
         rearLeftText.setText(String.format("RL: %.1f", control.getWheel(2).getFrictionSlip()));
         rearRightText.setText(String.format("RR: %.1f", control.getWheel(3).getFrictionSlip()));
         chunkX.setText(String.format("X Coord: %.1f",
-                                     Math.floor(cam.getLocation().x / ((200 - 1) * (SCALE / 16)))));
+                                     Math.floor(cam.getLocation().x / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
         chunkZ.setText(String.format("Z Coord: %.1f",
-                                     Math.floor(cam.getLocation().z / ((200 - 1) * (SCALE / 16)))));
+                                     Math.floor(cam.getLocation().z / ((CHUNK_SIZE - 1) * (SCALE / 16)))));
+        localX.setText(String.format("Local X: %.1f",
+                                     cam.getLocation().x % ((CHUNK_SIZE - 1) * (SCALE / 16))));
+        localZ.setText(String.format("Local Z: %.1f",
+                                     cam.getLocation().z % ((CHUNK_SIZE - 1) * (SCALE / 16))));
     }
 
     private void togglePause() {

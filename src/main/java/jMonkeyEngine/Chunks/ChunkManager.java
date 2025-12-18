@@ -86,6 +86,7 @@ public class ChunkManager {
 
                             // Generate road if this parent chunk is on the road's path
                             if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk) {
+                                System.out.println("Generating road for chunk: " + chunk);
                                 generateRoad(terrain, chunk);
                             }
 
@@ -200,12 +201,18 @@ public class ChunkManager {
         });
     }
 
-    private void generateTerrain(ChunkCoord chunk) throws IOException {
+    public float[][] generateTerrain(ChunkCoord chunk) {
+        if (generatedHeightmaps.containsKey(chunk)){
+            return generatedHeightmaps.get(chunk);
+        }
+
         loadingHeightmaps.add(chunk);
         float[][] terrain = generator.generateHeightMap(chunk);
 
         generatedHeightmaps.put(chunk, terrain);
         loadingHeightmaps.remove(chunk);
+
+        return terrain;
     }
 
     private void generateRoad(float[][] terrain, ChunkCoord chunk) {
@@ -221,9 +228,17 @@ public class ChunkManager {
             startZ = road.lastZCoord;
             startX = 0;
         }
-        List<jMonkeyEngine.Road.Node> pathPoints = road.getRoadPointsInChunk(terrain, startX,
-                                                                             startZ, CHUNK_SIZE - 1,
-                                                                             CHUNK_SIZE / 2);
+        HashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>> roadPointsInChunk = road.getRoadPointsInChunk(terrain, startX,
+                                                                                                  startZ, 300,
+                                                                                                  CHUNK_SIZE / 2, chunk);
+        System.out.println("generated roads for chunk: " + chunk);
+        System.out.println(roadPointsInChunk.keySet());
+
+        List<jMonkeyEngine.Road.Node> pathPoints = roadPointsInChunk.get(chunk);
+        if (pathPoints == null) {
+            System.out.println("No road points generated for chunk: " + chunk);
+            pathPoints = new ArrayList<>();
+        }
 
         generator.updateHeightMap(terrain, pathPoints);
         generatedRoads.put(chunk, pathPoints);
@@ -249,5 +264,9 @@ public class ChunkManager {
 
     public Geometry getChunk(ChunkCoord chunk) {
         return generatedChunks.get(chunk);
+    }
+
+    public float[][] getHeightmap(ChunkCoord chunk) {
+        return generatedHeightmaps.get(chunk);
     }
 }

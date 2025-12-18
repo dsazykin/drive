@@ -20,6 +20,7 @@ import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Road.RoadMeshGenerator;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -74,7 +75,7 @@ public class TerrainGenerator{
         this.manager = manager;
     }
 
-    public float[][] generateHeightMap(ChunkCoord chunk) throws IOException {
+    public float[][] generateHeightMap(ChunkCoord chunk) {
         return heightMap.generateHeightmap(chunk.x, chunk.z);
     }
 
@@ -310,9 +311,15 @@ public class TerrainGenerator{
         final ChunkCoord chunk = new ChunkCoord(0, 0);
         try {
             float[][] terrain = generateHeightMap(chunk);
-            List<jMonkeyEngine.Road.Node> pathPoints =
-                    road.getRoadPointsInChunk(terrain, 0, CHUNK_SIZE / 2, CHUNK_SIZE - 1,
-                                              CHUNK_SIZE / 2);
+            HashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>>
+                    roadPointsInChunk = road.getRoadPointsInChunk(terrain, 0,
+                                                                  CHUNK_SIZE / 2, 300,
+                                                                  CHUNK_SIZE / 2, chunk);
+            System.out.println(roadPointsInChunk.keySet());
+            List<jMonkeyEngine.Road.Node> pathPoints = roadPointsInChunk.get(chunk);
+            if (pathPoints == null) {
+                pathPoints = new ArrayList<>();
+            }
             updateHeightMap(terrain, pathPoints);
 
             Mesh mesh = generateChunkMesh(terrain);

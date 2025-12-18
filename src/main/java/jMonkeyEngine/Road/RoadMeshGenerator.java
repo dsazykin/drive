@@ -159,6 +159,7 @@ public class RoadMeshGenerator {
         RigidBodyControl rbc = new RigidBodyControl(shape, 0f);
         roadGeom.addControl(rbc);
 
+        System.out.println("generated road mesh for chunk " + chunk);
         return roadGeom;
     }
 
@@ -205,30 +206,70 @@ public class RoadMeshGenerator {
         float unit = (SCALE / 16f);
         List<Vector3f> controlPoints = new ArrayList<>();
 
+        // 1. Calculate the Current Chunk's Start Point in World Space
+        float startX = roadPoints.get(0).x * unit;
+        float startZ = roadPoints.get(0).y * unit;
+
+        boolean useGhost = false;
+
         if (ghostNode != null) {
-            float x = ghostNode.x * unit;
-            float z = ghostNode.y * unit;
+            float ghostX = ghostNode.x * unit;
+            float ghostZ = ghostNode.y * unit;
 
-            float height = sampleHeightFromTwoChunks(
-                    heightmap, prevHeightmap,
-                    ghostNode.x, ghostNode.y,
-                    prevXOffset, prevZOffset
-            ) * MAX_HEIGHT;
+            // Calculate distance squared to avoid slow Sqrt
+            float dx = ghostX - startX;
+            float dz = ghostZ - startZ;
+            float distSq = dx*dx + dz*dz;
 
-            controlPoints.add(new Vector3f(x, height, z));
+            // INCREASE THRESHOLD: If they are further than ~0.1 units (adjust based on scale)
+            // we treat them as separate. Otherwise, we assume they are the connecting point.
+            if (distSq > 0.01f) {
+                float height = sampleHeightFromTwoChunks(
+                        heightmap, prevHeightmap,
+                        ghostNode.x, ghostNode.y,
+                        prevXOffset, prevZOffset
+                ) * MAX_HEIGHT;
+                controlPoints.add(new Vector3f(ghostX, height, ghostZ));
+                useGhost = true;
+            } else {
+                // CRITICAL FIX: If they are too close, snap P0 to Ghost to prevent holes,
+                // but DO NOT add Ghost to the list. P0 becomes the start.
+                // This prevents the "micro-segment" loop.
+                float height = sampleHeightFromTwoChunks(
+                        heightmap, prevHeightmap,
+                        ghostNode.x, ghostNode.y,
+                        prevXOffset, prevZOffset
+                ) * MAX_HEIGHT;
+
+                // We will add this snapped position as the first point below
+                startX = ghostX;
+                startZ = ghostZ;
+                // You might want to override the height of roadPoints[0] here too
+            }
         }
 
-        for (Node node : roadPoints) {
+        // 2. Add current points
+        for (int i = 0; i < roadPoints.size(); i++) {
+            Node node = roadPoints.get(i);
             float x = node.x * unit;
             float z = node.y * unit;
-            // Standard internal nodes always use the current heightmap
+
+            // If we snapped P0 to Ghost, ensure we use those coords for i==0
+            if (!useGhost && i == 0 && ghostNode != null) {
+                x = ghostNode.x * unit;
+                z = ghostNode.y * unit;
+            }
+
             float height = sampleHeight(heightmap, node.x, node.y) * MAX_HEIGHT;
             controlPoints.add(new Vector3f(x, height, z));
         }
 
-        int subdivisions = 8;
-        int startIndex = (ghostNode != null) ? 1 : 0;
+        // 3. Generate Spline
+        // If we used a ghost, we start interpolation at index 1 (using ghost as tangent control)
+        // If we didn't use a ghost, we start at index 0
+        int startIndex = useGhost ? 1 : 0;
 
+        int subdivisions = 8;
         for (int i = startIndex; i < controlPoints.size() - 1; i++) {
             Vector3f p0 = (i == 0) ? controlPoints.get(i) : controlPoints.get(i - 1);
             Vector3f p1 = controlPoints.get(i);
