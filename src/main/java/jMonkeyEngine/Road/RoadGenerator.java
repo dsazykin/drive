@@ -63,7 +63,7 @@ public class RoadGenerator {
         });
     }
 
-    public HashMap<ChunkCoord, List<Node>> getRoadPointsInChunk(float[][] heightmap, int startX, int startY, int goalX, int goalY, ChunkCoord chunk) {
+    public HashMap<ChunkCoord, List<Node>> getRoadPointsInChunk(float[][] heightmap, List<Node> existingPoints, int startX, int startY, int goalX, ChunkCoord chunk) {
         int rows = heightmap.length;
         int cols = heightmap[0].length;
 
@@ -79,15 +79,39 @@ public class RoadGenerator {
         visitedMaps.put(chunk, new boolean[rows][cols]);
         nodeMaps.put(chunk, new Node[rows][cols]);
 
-        Node start = new Node(startX, startY, getRoadHeight(startX, startY, heightmap), 0,
-                              heuristic(startX, goalX), null, chunk);
+        if (existingPoints != null && !existingPoints.isEmpty()) {
+            // SCENARIO A: Resuming from existing path (Neighbor -> Current)
 
-        start.dxFromParent = lastExitDx;
-        start.dyFromParent = lastExitDy;
-        start.dirMag = (float) Math.sqrt(lastExitDx * lastExitDx + lastExitDy * lastExitDy);
+            // 1. Load ALL existing points into the map so we don't overlap them
+            for (Node node : existingPoints) {
+                // Ensure the node belongs to this chunk (sanity check)
+                if (node.chunk.equals(chunk)) {
+                    visitedMaps.get(chunk)[node.x][node.y] = true;
+                    nodeMaps.get(chunk)[node.x][node.y] = node;
+                }
+            }
 
-        currentSet.add(start);
-        nodeMaps.get(chunk)[startX][startY] = start;
+            // 2. Pick the last node as the "Start" (The Frontier)
+            Node tip = existingPoints.get(existingPoints.size() - 1);
+            existingPoints.get(0).parent = null;
+
+            // 3. Add to Queue to resume A*
+            currentSet.add(tip);
+
+        } else {
+            // SCENARIO B: Fresh Start (First Chunk)
+
+            Node start = new Node(startX, startY, getRoadHeight(startX, startY, heightmap), 0,
+                                  Math.abs(startX - goalX), null, chunk);
+
+            // Default forward momentum for the very first node
+            start.dxFromParent = 1;
+            start.dyFromParent = 0;
+            start.dirMag = 1;
+
+            currentSet.add(start);
+            nodeMaps.get(chunk)[startX][startY] = start;
+        }
 
         boolean enteredFromTop = (startY >= cols - 1);
         boolean enteredFromBottom = (startY <= 0);
@@ -243,9 +267,9 @@ public class RoadGenerator {
                 }
             }
         }
-        HashMap<ChunkCoord, List<Node>> emptyMap = new HashMap<>();
-        emptyMap.put(chunk, new ArrayList<>());
-        return emptyMap;
+        HashMap<ChunkCoord, List<Node>> result = new HashMap<>();
+        if (existingPoints != null) result.put(chunk, new ArrayList<>(existingPoints));
+        return result;
     }
 
     private float getRoadHeight(int x, int y, float[][] terrain) {

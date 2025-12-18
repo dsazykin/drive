@@ -312,9 +312,8 @@ public class TerrainGenerator{
         try {
             float[][] terrain = generateHeightMap(chunk);
             HashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>>
-                    roadPointsInChunk = road.getRoadPointsInChunk(terrain, 0,
-                                                                  CHUNK_SIZE / 2, 300,
-                                                                  CHUNK_SIZE / 2, chunk);
+                    roadPointsInChunk = road.getRoadPointsInChunk(terrain, null, 0,
+                                                                  CHUNK_SIZE / 2, 300, chunk);
             System.out.println(roadPointsInChunk.keySet());
             List<jMonkeyEngine.Road.Node> pathPoints = roadPointsInChunk.get(chunk);
             if (pathPoints == null) {

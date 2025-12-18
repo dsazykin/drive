@@ -9,7 +9,6 @@ import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import jMonkeyEngine.Road.RoadGenerator;
 import jMonkeyEngine.Terrain.TerrainGenerator;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -22,19 +21,24 @@ public class ChunkManager {
     private final SimpleApplication main;
     private final ExecutorService executor;
 
+    // Lock specifically for synchronizing road state operations
+    private final Object roadLock = new Object();
+
     private final int CHUNK_SIZE;
     private final float SCALE;
     private final int RENDER_DISTANCE;
 
+    // Loading sets
     Set<ChunkCoord> loadingChunks = ConcurrentHashMap.newKeySet();
     Set<ChunkCoord> loadingHeightmaps = ConcurrentHashMap.newKeySet();
     Set<ChunkCoord> loadingRoads = ConcurrentHashMap.newKeySet();
+
+    // Asset storage
     private final ConcurrentHashMap<ChunkCoord, Geometry> loadedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, Geometry> loadedRoads = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, Geometry> generatedChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkCoord, float[][]> generatedHeightmaps = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>> generatedRoads =
-            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>> generatedRoads = new ConcurrentHashMap<>();
 
     public ChunkManager(BulletAppState bulletAppState, Node rootNode, RoadGenerator road,
                         TerrainGenerator generator, SimpleApplication main, ExecutorService executor,
@@ -68,194 +72,248 @@ public class ChunkManager {
                 int chunkX = playerChunkX + dx;
                 int chunkZ = playerChunkZ + dz;
                 final ChunkCoord chunk = new ChunkCoord(chunkX, chunkZ);
-
                 neededChunks.add(chunk);
 
+                // --- CASE 1: Standard Chunk Loading ---
                 if (!loadedChunks.containsKey(chunk) && !loadingChunks.contains(chunk)) {
                     loadingChunks.add(chunk);
                     executor.submit(() -> {
                         try {
-                            if (!generatedHeightmaps.containsKey(chunk) && !loadingHeightmaps.contains(chunk)) {
-                                generateTerrain(chunk);
-                            }
-                            float[][] terrain = generatedHeightmaps.get(chunk);
+                            // Generate or fetch terrain
+                            float[][] terrain = generateTerrain(chunk);
 
-                            if (terrain == null) {
-                                generateTerrain(chunk);
-                            }
-
-                            // Generate road if this parent chunk is on the road's path
-                            if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk) {
-                                System.out.println("Generating road for chunk: " + chunk);
-                                generateRoad(terrain, chunk);
+                            // Synchronize road generation to ensure linear path consistency
+                            synchronized (roadLock) {
+                                if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk) {
+                                    System.out.println("Generating road for chunk: " + chunk);
+                                    generateRoadData(terrain, chunk);
+                                }
                             }
 
-                            addChunk(terrain, chunk);
+                            buildAndAttachChunk(terrain, chunk);
                         } catch (Exception e) {
                             e.printStackTrace();
                         } finally {
                             loadingChunks.remove(chunk);
                         }
                     });
-                } else if (loadedChunks.containsKey(chunk)) {
-                    executor.submit(() -> {
-                        try {
-                            float[][] terrain = generatedHeightmaps.get(chunk);
+                }
+                // --- CASE 2: Catch-Up (Road data arrived after chunk loaded) ---
+                else if (loadedChunks.containsKey(chunk)) {
+                    // Check if we have road points data BUT no road geometry visual
+                    boolean hasPoints = generatedRoads.containsKey(chunk);
+                    boolean hasGeometry = loadedRoads.containsKey(chunk);
 
-                            if (terrain == null) {
-                                generateTerrain(chunk);
-                            }
+                    // Also check if this is the "Active Head" of the road that needs recalculating
+                    boolean isActiveHead;
+                    synchronized (roadLock) {
+                        isActiveHead = (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk);
+                    }
 
-                            // Generate road if this parent chunk is on the road's path
-                            if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk && !loadingRoads.contains(chunk)) {
-                                loadingRoads.add(chunk);
+                    if ((hasPoints && !hasGeometry) || (isActiveHead && !loadingRoads.contains(chunk))) {
+                        // Avoid duplicates
+                        if (loadingRoads.contains(chunk)) continue;
 
-                                Geometry geometry = loadedChunks.get(chunk);
-                                Geometry oldRoadGeom = loadedRoads.get(chunk);
+                        loadingRoads.add(chunk);
+                        executor.submit(() -> {
+                            try {
+                                float[][] terrain = generatedHeightmaps.get(chunk);
+                                if (terrain == null) terrain = generateTerrain(chunk);
 
-                                main.enqueue(() -> {
-                                    if (geometry != null) {
-                                        geometry.removeFromParent();
-                                        bulletAppState.getPhysicsSpace().remove(geometry);
-                                        loadedChunks.remove(chunk);
+                                synchronized (roadLock) {
+                                    // Verify active head status again inside lock
+                                    if (chunk.x == road.currentXChunk && chunk.z == road.currentZChunk) {
+                                        cleanupOldRoad(chunk);
+                                        generateRoadData(terrain, chunk);
                                     }
-                                    if (oldRoadGeom != null) {
-                                        RigidBodyControl oldRoadPhysics = oldRoadGeom.getControl(RigidBodyControl.class);
-                                        if (oldRoadPhysics != null) {
-                                            bulletAppState.getPhysicsSpace().remove(oldRoadPhysics);
-                                        }
-                                        oldRoadGeom.removeFromParent();
-                                        loadedRoads.remove(chunk);
-                                    }
-                                });
+                                }
 
-                                generateRoad(terrain, chunk);
-                                addChunk(terrain, chunk);
+                                // Build visual only (Terrain mesh is already there)
+                                buildAndAttachRoadOnly(terrain, chunk);
+
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            } finally {
                                 loadingRoads.remove(chunk);
                             }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        } finally {
-                            loadingRoads.remove(chunk);
-                        }
-                    });
+                        });
+                    }
                 }
             }
         }
 
-        // Unload chunks that are no longer needed
+        unloadUnusedChunks(neededChunks);
+    }
+
+    // --- Helpers ---
+
+    public float[][] generateTerrain(ChunkCoord chunk) {
+        return generatedHeightmaps.computeIfAbsent(chunk, generator::generateHeightMap);
+    }
+
+    private void generateRoadData(float[][] terrain, ChunkCoord chunk) {
+        Integer startX;
+        Integer startZ;
+
+        // Read shared state safely
+        if (road.verticalExitUp) {
+            startZ = CHUNK_SIZE - 1;
+            startX = road.lastXCoord;
+        } else if (road.verticalExitDown) {
+            startZ = 0;
+            startX = road.lastXCoord;
+        } else {
+            startZ = road.lastZCoord;
+            startX = 0;
+        }
+
+        List<jMonkeyEngine.Road.Node> existingPoints = null;
+        if (generatedRoads.containsKey(chunk)) {
+            existingPoints = generatedRoads.get(chunk);
+        }
+
+        HashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>> roadPointsInChunk =
+                road.getRoadPointsInChunk(terrain, existingPoints, startX, startZ, 300, chunk);
+
+        if (!roadPointsInChunk.containsKey(chunk)) {
+            System.out.println("WARNING: Pathfinder returned no key for current chunk " + chunk + ". Creating empty list.");
+            roadPointsInChunk.put(chunk, new ArrayList<>());
+        }
+
+        // SAVE ALL DATA: Current Chunk AND Neighbors
+        for (Map.Entry<ChunkCoord, List<jMonkeyEngine.Road.Node>> entry : roadPointsInChunk.entrySet()) {
+            ChunkCoord coord = entry.getKey();
+            List<jMonkeyEngine.Road.Node> points = entry.getValue();
+
+            // Store points so neighbor chunks can find them later
+            generatedRoads.put(coord, points);
+
+            // If this is the active chunk, update the terrain heightmap immediately
+            if (coord.equals(chunk)) {
+                generator.updateHeightMap(terrain, points);
+            }
+        }
+    }
+
+    private void buildAndAttachChunk(float[][] terrain, ChunkCoord chunk) {
+        Mesh mesh = generator.generateChunkMesh(terrain);
+        Geometry chunkGeom = generator.createGeometry(chunk, mesh);
+        generatedChunks.put(chunk, chunkGeom);
+
+        main.enqueue(() -> {
+            if (!loadingChunks.contains(chunk) && !loadedChunks.containsKey(chunk)) {
+                 rootNode.attachChild(chunkGeom);
+                 bulletAppState.getPhysicsSpace().add(chunkGeom.getControl(RigidBodyControl.class));
+
+                loadedChunks.put(chunk, chunkGeom);
+
+                // Attach Road Visuals if points exist
+                attachRoadVisuals(chunk, terrain);
+            }
+        });
+    }
+
+    private void buildAndAttachRoadOnly(float[][] terrain, ChunkCoord chunk) {
+        main.enqueue(() -> {
+            // Only attach if the parent chunk is still loaded
+            if (loadedChunks.containsKey(chunk)) {
+                attachRoadVisuals(chunk, terrain);
+            }
+        });
+    }
+
+    // Must be run on Main Thread
+    private void attachRoadVisuals(ChunkCoord chunk, float[][] terrain) {
+        if (loadedRoads.containsKey(chunk)) {
+            return; // Already has a road
+        }
+
+        List<jMonkeyEngine.Road.Node> roadPoints = generatedRoads.get(chunk);
+
+        if (roadPoints == null) {
+            System.out.println("Skipping road visual for " + chunk + ": Points list is NULL.");
+            return;
+        }
+        if (roadPoints.isEmpty()) {
+            System.out.println("Skipping road visual for " + chunk + ": Points list is EMPTY.");
+            return;
+        }
+
+        Geometry roadGeom;
+        synchronized (roadLock) {
+            roadGeom = generator.generateRoadGeometry(roadPoints, chunk, terrain,
+                                                      road.lastRoadNode,
+                                                      road.lastChunkCoord, road.lastHeightmap);
+
+            // Only update state if generation was successful
+            if (roadGeom != null) {
+                road.lastRoadNode = roadPoints.get(roadPoints.size() - 1);
+                road.lastChunkCoord = chunk;
+                road.lastHeightmap = terrain;
+
+                System.out.println("generated road mesh for chunk " + chunk); // SUCCESS LOG
+            } else {
+                System.out.println("Failed to generate road mesh for " + chunk + " (Generator returned null)");
+            }
+        }
+
+        if (roadGeom != null) {
+            RigidBodyControl roadPhysics = new RigidBodyControl(0f);
+            roadGeom.addControl(roadPhysics);
+
+            rootNode.attachChild(roadGeom);
+            bulletAppState.getPhysicsSpace().add(roadPhysics);
+
+            loadedRoads.put(chunk, roadGeom);
+        }
+    }
+
+    private void cleanupOldRoad(ChunkCoord chunk) {
+        main.enqueue(() -> {
+            Geometry oldRoad = loadedRoads.remove(chunk);
+            if (oldRoad != null) {
+                RigidBodyControl phy = oldRoad.getControl(RigidBodyControl.class);
+                if (phy != null) bulletAppState.getPhysicsSpace().remove(phy);
+                oldRoad.removeFromParent();
+            }
+        });
+    }
+
+    private void unloadUnusedChunks(Set<ChunkCoord> neededChunks) {
         loadedChunks.entrySet().removeIf(entry -> {
             if (!neededChunks.contains(entry.getKey())) {
-                Geometry chunk = entry.getValue();
-                chunk.removeFromParent();
-                bulletAppState.getPhysicsSpace().remove(chunk);
+                ChunkCoord coord = entry.getKey();
+                Geometry chunkGeom = entry.getValue();
 
-                // Also remove road geometry and physics if it exists
-                Geometry roadGeom = loadedRoads.remove(entry.getKey());
-                if (roadGeom != null) {
-                    RigidBodyControl roadPhysics = roadGeom.getControl(RigidBodyControl.class);
-                    if (roadPhysics != null) {
-                        bulletAppState.getPhysicsSpace().remove(roadPhysics);
+                main.enqueue(() -> {
+                    chunkGeom.removeFromParent();
+                    bulletAppState.getPhysicsSpace().remove(chunkGeom);
+
+                    Geometry roadGeom = loadedRoads.remove(coord);
+                    if (roadGeom != null) {
+                        RigidBodyControl roadPhy = roadGeom.getControl(RigidBodyControl.class);
+                        if (roadPhy != null) bulletAppState.getPhysicsSpace().remove(roadPhy);
+                        roadGeom.removeFromParent();
                     }
-                    roadGeom.removeFromParent();
-                    loadedRoads.remove(entry.getKey());
-                }
-
+                });
                 return true;
             }
             return false;
         });
     }
 
-    private void addChunk(float[][] terrain, ChunkCoord chunk) {
-        Mesh mesh = generator.generateChunkMesh(terrain);
-        Geometry chunkGeom = generator.createGeometry(chunk, mesh);
-
-        loadedChunks.put(chunk, chunkGeom);
-        loadingChunks.remove(chunk);
-
-        main.enqueue(() -> {
-            rootNode.attachChild(chunkGeom);
-            bulletAppState.getPhysicsSpace().add(
-                    chunkGeom.getControl(RigidBodyControl.class));
-
-            // Add road geometry if it exists for this chunk
-            List<jMonkeyEngine.Road.Node> roadPoints = generatedRoads.get(chunk);
-            if (roadPoints != null && !roadPoints.isEmpty()) {
-                Geometry roadGeom = generator.generateRoadGeometry(roadPoints, chunk, terrain,
-                                                                   road.lastRoadNode,
-                                                                   road.lastChunkCoord, road.lastHeightmap);
-                road.lastRoadNode = roadPoints.get(roadPoints.size() - 1);
-                road.lastChunkCoord = chunk;
-                road.lastHeightmap = terrain;
-                if (roadGeom != null) {
-                    // Add physics to the road
-                    RigidBodyControl roadPhysics = new RigidBodyControl(0f); // 0f = static (immovable)
-                    roadGeom.addControl(roadPhysics);
-
-                    loadedRoads.put(chunk, roadGeom);
-                    rootNode.attachChild(roadGeom);
-                    bulletAppState.getPhysicsSpace().add(roadPhysics);
-                }
-            }
-        });
-    }
-
-    public float[][] generateTerrain(ChunkCoord chunk) {
-        if (generatedHeightmaps.containsKey(chunk)){
-            return generatedHeightmaps.get(chunk);
-        }
-
-        loadingHeightmaps.add(chunk);
-        float[][] terrain = generator.generateHeightMap(chunk);
-
-        generatedHeightmaps.put(chunk, terrain);
-        loadingHeightmaps.remove(chunk);
-
-        return terrain;
-    }
-
-    private void generateRoad(float[][] terrain, ChunkCoord chunk) {
-        Integer startX;
-        Integer startZ;
-        if (road.verticalExitUp) {
-            startZ = 0;
-            startX = road.lastXCoord;
-        } else if (road.verticalExitDown) {
-            startZ = CHUNK_SIZE - 1;
-            startX = road.lastXCoord;
-        } else {
-            startZ = road.lastZCoord;
-            startX = 0;
-        }
-        HashMap<ChunkCoord, List<jMonkeyEngine.Road.Node>> roadPointsInChunk = road.getRoadPointsInChunk(terrain, startX,
-                                                                                                  startZ, 300,
-                                                                                                  CHUNK_SIZE / 2, chunk);
-        System.out.println("generated roads for chunk: " + chunk);
-        System.out.println(roadPointsInChunk.keySet());
-
-        List<jMonkeyEngine.Road.Node> pathPoints = roadPointsInChunk.get(chunk);
-        if (pathPoints == null) {
-            System.out.println("No road points generated for chunk: " + chunk);
-            pathPoints = new ArrayList<>();
-        }
-
-        generator.updateHeightMap(terrain, pathPoints);
-        generatedRoads.put(chunk, pathPoints);
-    }
-
+    // Accessors
     public float getHeight(int MAX_HEIGHT, int x, int z, ChunkCoord chunk) {
         float[][] heightMap = generatedHeightmaps.get(chunk);
-        return (heightMap[x][z]) * MAX_HEIGHT;
+        return (heightMap != null) ? (heightMap[x][z]) * MAX_HEIGHT : 0;
     }
 
     public Vector3f getCamDirection(float height) {
         List<jMonkeyEngine.Road.Node> nodes = generatedRoads.get(new ChunkCoord(0, 0));
+        if (nodes == null || nodes.size() < 2) return new Vector3f(0, height, 0);
+
         jMonkeyEngine.Road.Node point = nodes.get(1);
-        System.out.println(point.x * (SCALE / 16));
-        System.out.println(point.y * (SCALE / 16));
-        return new Vector3f(point.x * (SCALE / 16), height - 15,
-                            point.y * (SCALE / 16));
+        return new Vector3f(point.x * (SCALE / 16), height - 15, point.y * (SCALE / 16));
     }
 
     public List<jMonkeyEngine.Road.Node> getRoadPoints(ChunkCoord chunk) {
